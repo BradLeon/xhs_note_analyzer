@@ -1,0 +1,513 @@
+ SystemMessage 
+You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.
+
+# Input Format
+
+Task
+Previous steps
+Current URL
+Open Tabs
+Interactive Elements
+[index]<type>text</type>
+
+- index: Numeric identifier for interaction
+- type: HTML element type (button, input, etc.)
+- text: Element description
+  Example:
+  [33]<div>User form</div>
+  \t*[35]*<button aria-label='Submit form'>Submit</button>
+
+- Only elements with numeric indexes in [] are interactive
+- (stacked) indentation (with \t) is important and means that the element is a (html) child of the element above (with a lower index)
+- Elements with \* are new elements that were added after the previous step (if url has not changed)
+
+# Response Rules
+
+1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:
+   {"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
+   "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
+   "next_goal": "What needs to be done with the next immediate action"},
+   "action":[{"one_action_name": {// action-specific parameter}}, // ... more actions in sequence]}
+
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum 10 actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+5. TASK COMPLETION:
+
+- Use the done action as the last action as soon as the ultimate task is complete
+- Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps.
+- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completely finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
+- Don't hallucinate actions
+- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task.
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+8. Long tasks:
+
+- Keep track of the status and subresults in the memory.
+- You are provided with procedural memory summaries that condense previous task history (every N steps). Use these summaries to maintain context about completed actions, current progress, and next steps. The summaries appear in chronological order and contain key information about navigation history, findings, errors encountered, and current state. Refer to these summaries to avoid repeating actions and to ensure consistent progress toward the task goal.
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+
+Your responses must be always JSON with the specified format.
+
+ HumanMessage 
+Your ultimate task is: """
+你是一个专业的小红书数据采集助手，具备精确的元素定位能力。你的任务是采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**重要提示：相关性判断标准**
+不要只进行字面量匹配！要根据以下标准判断相关性：
+1. 行业相关性：属于同一个行业领域（教育培训、求职就业、考试备考等）
+2. 目标用户群体：面向相似的用户群体（求职者、备考人员、职场新人等）  
+3. 功能相关性：提供类似的服务或解决相似的问题（技能提升、职业规划、考试指导等）
+
+**🎯 任务目标：**
+采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**📋 相关性判断标准：**
+不要只进行字面量匹配！要根据语义相关性判断：
+- 行业相关：教育培训、求职就业、考试备考等
+- 用户群体：求职者、备考人员、职场新人等  
+- 功能相关：技能提升、职业规划、考试指导等
+
+**🔍 执行步骤：**
+1. Go to https://ad.xiaohongshu.com/
+2. 导航到: 数据 -> 笔记 -> 内容灵感页面, 使用 navigate_to_content_inspiration tool
+3. 获取当前页面核心笔记的所有标题，使用 get_core_note_titles tool
+4. 从当前页面所有核心笔记的标题中提取有相关性的标题，使用 extract_related_titles tool
+5. 使用 process_all_related_notes tool 批量处理所有相关标题的笔记详情，每个笔记执行：打开详情页 -> 提取数据 -> 关闭详情页的操作
+6. 使用 get_collection_status tool 查看当前采集进度和状态
+7. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理10页
+8. 最终使用 get_collection_status tool 获取完整的采集结果
+
+**⚠️ 重要约束：**
+- 如果某个action连续失败，请立即使用 get_collection_status 获取已采集的数据并输出结果
+- 不要无限重试失败的操作，优先保证已采集数据的完整性
+- 如果出现技术问题，请立即使用 get_collection_status 输出当前已采集的数据
+
+**最终输出格式：**
+请以结构化的JSON格式输出结果:
+
+{
+  "note_data_list": [
+    {
+      "note_title": 笔记标题,
+      "note_url": 完整URL, 
+      "impression": 曝光量数字,
+      "click": 阅读量数字,
+      "like": 点赞量数字,
+      "collect": 收藏量数字,
+      "comment": 评论量数字,
+      "engage": 互动量数字
+    }
+  ]
+}
+
+
+""". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.
+
+ HumanMessage 
+Example output:
+
+ AIMessage 
+
+
+ ToolMessage 
+Browser started
+
+ HumanMessage 
+[Your task history memory starts here]
+
+ AIMessage 
+{
+  "state_analysis": "Task initialization phase. Browser is currently on a blank page (about:blank) with no active tabs or interactive elements. No actions have been taken yet.",
+  "progress_evaluation": "0% - No steps of the data collection process have been initiated. The target URL has not been accessed.",
+  "challenges": [
+    "Initial navigation to https://ad.xiaohongshu.com/ may fail due to network issues or site unavailability",
+    "Authentication requirements for the ads platform could interrupt workflow",
+    "Page structure may differ from expectations, requiring adaptive navigation"
+  ],
+  "next_steps": [
+    "Navigate to the starting URL: https://ad.xiaohongshu.com/",
+    "After page load, use navigate_to_content_inspiration tool to access the content inspiration section",
+    "Verify successful navigation to the '\u6570\u636e -> \u7b14\u8bb0 -> \u5185\u5bb9\u7075\u611f' page"
+  ],
+  "reasoning": "The first critical milestone is accessing the content inspiration page where core notes are displayed. Without completing this foundational step, no data collection can occur. Starting with URL navigation establishes the workflow baseline before proceeding to element interaction and data extraction phases."
+}
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ HumanMessage 
+Action result: 🔗  Navigated to https://ad.xiaohongshu.com/
+
+ AIMessage 
+{
+  "state_analysis": "Navigated to the ad platform homepage but encountered an empty campaign management page. No data collection steps have been initiated yet.",
+  "progress_evaluation": "0% - No data collected; navigation to target page not completed.",
+  "challenges": [
+    "Empty page suggests potential login requirement or incorrect initial landing",
+    "Lack of interactive elements indicates navigation may fail without authentication",
+    "Credentials not provided in task constraints for login tool"
+  ],
+  "next_steps": [
+    "Attempt navigation to content inspiration page using navigate_to_content_inspiration tool",
+    "If navigation fails, immediately use get_collection_status to output empty results",
+    "Do not retry failed actions per task constraints"
+  ],
+  "reasoning": "The empty page suggests we may not be authenticated. Since credentials aren't provided, we must attempt the required navigation (step 2 of task). If it fails due to login issues, we follow constraints to output existing data (empty) rather than retrying."
+}
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ AIMessage 
+{
+  "state_analysis": "Successfully navigated to the content inspiration page. The page displays core notes with titles like '\u4e0b\u73ed\u65e5\u8bb0\uff5c\u751f\u6d3b\u5fd9\u5fd9\u788c\u788c\uff0c\u603b\u8981\u6709\u6240\u671f\u5f85' and '\u4f53\u5236\u5185\u5df2\u8003\u5b8c\u56db\u7c7b\u6709\u7528\u7684\u8bc1'. Industry category is set to '\u6559\u80b2\u57f9\u8bad/\u804c\u4e1a\u6559\u80b2', aligning with our target domain.",
+  "progress_evaluation": "10% - Initial navigation complete but no data collected yet. Core note titles are visible but not processed.",
+  "challenges": [
+    "Potential mismatch between visible note titles and target relevance (\u56fd\u4f01\u592e\u4f01\u6c42\u804c\u8f85\u5bfc)",
+    "Need to verify if extraction tools can handle Chinese characters and special symbols in titles"
+  ],
+  "next_steps": [
+    "Execute get_core_note_titles tool to capture all visible note titles",
+    "Run extract_related_titles tool to filter titles matching our semantic criteria",
+    "Call get_collection_status to establish baseline before processing"
+  ],
+  "reasoning": "Following the task sequence (step 3), we must first capture all titles before filtering. Getting initial status provides a checkpoint in case extraction fails. The visible titles suggest educational/occupational content but require formal relevance assessment."
+}
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ AIMessage 
+{
+  "state_analysis": "Successfully navigated to the content inspiration page and retrieved 20 core note titles. The current industry category is set to '\u6559\u80b2\u57f9\u8bad/\u804c\u4e1a\u6559\u80b2', aligning with our target domain. Titles include job search, exam preparation, and career development topics.",
+  "progress_evaluation": "30% - Completed initial navigation and title extraction, but no relevant notes processed yet.",
+  "challenges": [
+    "Need to filter titles for strict relevance to SOE job search coaching (industry/user/function match)",
+    "Potential login requirement for detailed data extraction not yet addressed",
+    "Risk of including irrelevant notes if semantic matching isn't precise"
+  ],
+  "next_steps": [
+    "Use extract_related_titles tool to filter titles based on SOE job search relevance criteria",
+    "If filtered titles exist, initiate process_all_related_notes for data extraction",
+    "Verify login status - if data extraction fails, consider using navigate_and_login_xiaohongshu_ad_platform"
+  ],
+  "reasoning": "Filtering titles now ensures only relevant notes are processed, saving resources. Checking login preemptively avoids interruptions during data extraction. Batch processing follows the task workflow efficiently."
+}
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ AIMessage 
+{
+  "state_analysis": "Successfully navigated to content inspiration page and retrieved core note titles. Attempted to extract related titles but encountered error: '\u672a\u627e\u5230\u63a8\u5e7f\u6807\u7684' (no related titles found). Current industry category is set to '\u6559\u80b2\u57f9\u8bad/\u804c\u4e1a\u6559\u80b2'. Core titles include topics about certificates, work diaries, and anxiety, but none were flagged as relevant.",
+  "progress_evaluation": "5% - Completed navigation and title retrieval but failed relevance filtering. 0/10 pages processed, 0 notes collected.",
+  "challenges": [
+    "Extract_related_titles tool returned no results despite potential semantic matches (e.g., '\u4f53\u5236\u5185\u5df2\u8003\u5b8c\u56db\u7c7b\u6709\u7528\u7684\u8bc1' aligns with exam preparation)",
+    "Risk of missing relevant content due to overly strict filtering criteria",
+    "First page processing stalled at relevance check stage"
+  ],
+  "next_steps": [
+    "Retry extract_related_titles tool with adjusted relevance parameters",
+    "If retry fails, use get_collection_status to capture current state (empty dataset)",
+    "Proceed to click_next_page to advance to page 2/10"
+  ],
+  "reasoning": "The relevance tool may have false-negative results. Retrying with adjusted parameters could capture notes like the certificate exam title. If unsuccessful, preserving progress via get_collection_status and moving to the next page maintains task momentum while adhering to 'no infinite retries' constraint. Page 2 might contain more explicitly relevant content."
+}
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ HumanMessage 
+Action error: 'NoneType' object is not iterable
+
+ AIMessage 
+{
+  "state_analysis": "On content inspiration page (page 1/10) with industry category '\u6559\u80b2\u57f9\u8bad/\u804c\u4e1a\u6559\u80b2'. Core note titles retrieved but extract_related_titles tool failed with 'NoneType' error. Titles include certificate exam preparation ('\u4f53\u5236\u5185\u5df2\u8003\u5b8c\u56db\u7c7b\u6709\u7528\u7684\u8bc1') which aligns with target criteria.",
+  "progress_evaluation": "10% - Navigation and title retrieval complete but relevance filtering failed. 0/10 pages processed, 0 notes collected.",
+  "challenges": [
+    "Extract_related_titles tool malfunctioning despite semantically relevant titles present",
+    "Potential loss of relevant notes (e.g., certificate exam title) due to tool failure",
+    "Risk of task stagnation if filtering issues persist across pages"
+  ],
+  "next_steps": [
+    "Retry extract_related_titles tool with focus on certificate exam title",
+    "Use get_collection_status to capture current state (0 notes)",
+    "Proceed to click_next_page for page 2/10"
+  ],
+  "reasoning": "The certificate exam title ('\u4f53\u5236\u5185\u5df2\u8003\u5b8c\u56db\u7c7b\u6709\u7528\u7684\u8bc1') clearly matches our target domain (exam preparation for public sector). Retrying extraction may succeed if the error was transient. Capturing status preserves progress per constraints, and advancing pages prevents deadlock while maintaining task momentum."
+}
+
+ HumanMessage 
+[Task history memory ends]
+[Current state starts here]
+The following is one-time information - if you need to remember it write it to memory:
+Current url: https://ad.xiaohongshu.com/microapp/traffic-guide/contentInspiration/
+Available tabs:
+[TabInfo(page_id=0, url='https://ad.xiaohongshu.com/microapp/traffic-guide/contentInspiration/', title='内容灵感 - 流量参谋', parent_page_id=None)]
+Interactive elements from top layer of the current page inside the viewport:
+[Start of page]
+[0]<div >概览
+资产
+工具
+财务 />
+	[1]<div >推广 />
+	[2]<div >创意 />
+	[3]<div >数据 />
+[4]<div >如何换绑邮箱/修改密码？ />
+[5]<button type='button' />
+	[6]<div  />
+		[7]<span  />
+			[8]<div  />
+[9]<div  />
+	[10]<span  />
+[11]<button type='button' />
+	[12]<div  />
+		[13]<span  />
+			[14]<span  />
+[15]<button type='button' />
+	[16]<div  />
+		[17]<span  />
+			[18]<div  />
+				[19]<span >琅琅前情-LR />
+[20]<button type='button' />
+	[21]<div  />
+		[22]<span >新建广告 />
+[23]<div  />
+[24]<div  />
+	[25]<span >0 />
+[26]<div  />
+	[27]<div  />
+[28]<h6 >内容灵感 />
+[29]<div >行业类目
+教育培训 / 职业教育 />
+	[30]<span  />
+[31]<div  />
+	[32]<div >近 7 日 />
+		[33]<span  />
+[34]<div  />
+	[35]<div  />
+	[36]<span >至 />
+	[37]<div  />
+	[38]<span  />
+[39]<div  />
+	[40]<div >营销诉求
+不限 />
+		[41]<span  />
+[42]<div  />
+	[43]<span >9 />
+	[44]<span >讲老师 />
+	[45]<span >49,436 />
+[46]<div  />
+	[47]<span >10 />
+	[48]<span >学生 />
+	[49]<span >41,493 />
+[50]<div  />
+	[51]<span >11 />
+	[52]<span >18岁 />
+	[53]<span >38,329 />
+[54]<div  />
+	[55]<span >12 />
+	[56]<span >教老师 />
+	[57]<span >32,895 />
+[58]<div  />
+	[59]<span >13 />
+	[60]<span >新手 />
+	[61]<span >30,725 />
+[62]<h6 >核心笔记 />
+[63]<span >类别 />
+[64]<div >高曝光、高点击 />
+[65]<div >高阅读、高互动 />
+[66]<span >使用最多题材 />
+[67]<span  />
+	[68]<span >经验教程 />
+[69]<span  />
+	[70]<span >单品推荐 />
+[71]<span  />
+	[72]<span >生活剧情 />
+[73]<span >使用最多形式 />
+[74]<span  />
+	[75]<span >图文 />
+[76]<span >使用最多笔记关键词 />
+[77]<span  />
+	[78]<span >老师 />
+[79]<span  />
+	[80]<span >教老师 />
+[81]<span  />
+	[82]<span >老师人 />
+[83]<div >下班日记｜生活忙忙碌碌，总要有所期待🫶
+|
+2025-06-12 />
+	[84]<div  />
+[85]<div >体制内已考完四类有用的证✌️ 花呗都提额了
+|
+2025-06-17 />
+	[86]<div  />
+[87]<div >焦虑洪流中的“异类”
+|
+2025-05-26 />
+	[88]<div  />
+[End of page]
+Current step: 6/100Current date and time: 2025-06-22 16:03
+
+ RESPONSE
+{
+  "current_state": {
+    "evaluation_previous_goal": "Failed - The extract_related_titles tool failed with a 'NoneType' error, indicating it did not return any results. This prevents us from proceeding with processing related notes.",
+    "memory": "We have navigated to the content inspiration page and attempted to extract related titles but encountered an error. We have not yet processed any notes. We are on page 1 out of 10 pages to process.",
+    "next_goal": "Retry the extract_related_titles tool with adjusted parameters to ensure we capture relevant titles. If this fails again, we will proceed to the next page."
+  },
+  "action": [
+    {
+      "extract_related_titles": {}
+    }
+  ]
+}

@@ -1,0 +1,217 @@
+ SystemMessage 
+You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.
+
+# Input Format
+
+Task
+Previous steps
+Current URL
+Open Tabs
+Interactive Elements
+[index]<type>text</type>
+
+- index: Numeric identifier for interaction
+- type: HTML element type (button, input, etc.)
+- text: Element description
+  Example:
+  [33]<div>User form</div>
+  \t*[35]*<button aria-label='Submit form'>Submit</button>
+
+- Only elements with numeric indexes in [] are interactive
+- (stacked) indentation (with \t) is important and means that the element is a (html) child of the element above (with a lower index)
+- Elements with \* are new elements that were added after the previous step (if url has not changed)
+
+# Response Rules
+
+1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:
+   {"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
+   "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
+   "next_goal": "What needs to be done with the next immediate action"},
+   "action":[{"one_action_name": {// action-specific parameter}}, // ... more actions in sequence]}
+
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum 10 actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+5. TASK COMPLETION:
+
+- Use the done action as the last action as soon as the ultimate task is complete
+- Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps.
+- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completely finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
+- Don't hallucinate actions
+- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task.
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+8. Long tasks:
+
+- Keep track of the status and subresults in the memory.
+- You are provided with procedural memory summaries that condense previous task history (every N steps). Use these summaries to maintain context about completed actions, current progress, and next steps. The summaries appear in chronological order and contain key information about navigation history, findings, errors encountered, and current state. Refer to these summaries to avoid repeating actions and to ensure consistent progress toward the task goal.
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+
+Your responses must be always JSON with the specified format.
+
+ HumanMessage 
+Your ultimate task is: """
+你是一个专业的小红书数据采集助手，具备精确的元素定位能力。你的任务是采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**重要提示：相关性判断标准**
+不要只进行字面量匹配！要根据以下标准判断相关性：
+1. 行业相关性：属于同一个行业领域（教育培训、求职就业、考试备考等）
+2. 目标用户群体：面向相似的用户群体（求职者、备考人员、职场新人等）  
+3. 功能相关性：提供类似的服务或解决相似的问题（技能提升、职业规划、考试指导等）
+
+**🎯 任务目标：**
+采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**📋 相关性判断标准：**
+不要只进行字面量匹配！要根据语义相关性判断：
+- 行业相关：教育培训、求职就业、考试备考等
+- 用户群体：求职者、备考人员、职场新人等  
+- 功能相关：技能提升、职业规划、考试指导等
+
+**🔍 执行步骤：**
+1. Go to https://ad.xiaohongshu.com/
+2. 导航到: 数据 -> 笔记 -> 内容灵感页面, 使用 navigate_to_content_inspiration tool
+3. 获取当前页面核心笔记的所有标题，使用 get_core_note_titles tool
+4. 从当前页面所有核心笔记的标题中提取有相关性的标题，使用 extract_related_titles tool
+5. 使用 process_all_related_notes tool 批量处理所有相关标题的笔记详情，每个笔记执行：打开详情页 -> 提取数据 -> 关闭详情页的操作
+6. 使用 get_collection_status tool 查看当前采集进度和状态
+7. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理10页
+8. 最终使用 get_collection_status tool 获取完整的采集结果
+
+**⚠️ 重要约束：**
+- 如果某个action连续失败，请立即使用 get_collection_status 获取已采集的数据并输出结果
+- 不要无限重试失败的操作，优先保证已采集数据的完整性
+- 如果出现技术问题，请立即使用 get_collection_status 输出当前已采集的数据
+
+**最终输出格式：**
+请以结构化的JSON格式输出结果:
+
+{
+  "note_data_list": [
+    {
+      "note_title": 笔记标题,
+      "note_url": 完整URL, 
+      "impression": 曝光量数字,
+      "click": 阅读量数字,
+      "like": 点赞量数字,
+      "collect": 收藏量数字,
+      "comment": 评论量数字,
+      "engage": 互动量数字
+    }
+  ]
+}
+
+
+""". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.
+
+ HumanMessage 
+Example output:
+
+ AIMessage 
+
+
+ ToolMessage 
+Browser started
+
+ HumanMessage 
+[Your task history memory starts here]
+
+ AIMessage 
+```json
+{
+  "state_analysis": "The agent has just started and the browser is initialized. The current URL is about:blank, and there are no interactive elements available on the page yet. The task is to collect data on Xiaohongshu notes related to \"国企央企求职辅导小程序\".",
+  "progress_evaluation": "0% - The task has not started yet. The initial setup of the browser is complete.",
+  "challenges": [
+    "No specific challenges identified yet as the task has not commenced.",
+    "The initial URL is 'about:blank', indicating that no website has been loaded yet. The first step requires navigating to a specific URL."
+  ],
+  "next_steps": [
+    "Navigate to https://ad.xiaohongshu.com/ using the `navigate_to` tool.",
+    "Once the page loads, proceed to the next step of navigating to the 'Data -> Notes -> Content Inspiration' page using the `navigate_to_content_inspiration` tool."
+  ],
+  "reasoning": "The ultimate goal requires starting by navigating to the specified website 'https://ad.xiaohongshu.com/'. After successfully loading the homepage, the next logical step according to the provided execution steps is to navigate to the 'Data -> Notes -> Content Inspiration' page. This will set up the environment for data collection."
+}
+```
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+click next page: 
+{click_next_page: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ HumanMessage 
+Action result: 🔗  Navigated to https://ad.xiaohongshu.com/
+
+ HumanMessage 
+[Task history memory ends]
+[Current state starts here]
+The following is one-time information - if you need to remember it write it to memory:
+Current url: about:blank
+Available tabs:
+[TabInfo(page_id=0, url='about:blank', title='', parent_page_id=None)]
+Interactive elements from top layer of the current page inside the viewport:
+empty page
+Current step: 2/100Current date and time: 2025-06-23 07:54
+
+ RESPONSE
+{
+  "current_state": {
+    "evaluation_previous_goal": "Success - The agent successfully navigated to the Xiaohongshu ad platform. The current URL is https://ad.xiaohongshu.com/.",
+    "memory": "1. Navigated to https://ad.xiaohongshu.com/. 0 out of 10 pages processed.",
+    "next_goal": "Navigate to the 'Data -> Notes -> Content Inspiration' page."
+  },
+  "action": [
+    {
+      "navigate_to_content_inspiration": {}
+    }
+  ]
+}

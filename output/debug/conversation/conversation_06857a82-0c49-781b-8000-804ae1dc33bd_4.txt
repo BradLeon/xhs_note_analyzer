@@ -1,0 +1,367 @@
+ SystemMessage 
+You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.
+
+# Input Format
+
+Task
+Previous steps
+Current URL
+Open Tabs
+Interactive Elements
+[index]<type>text</type>
+
+- index: Numeric identifier for interaction
+- type: HTML element type (button, input, etc.)
+- text: Element description
+  Example:
+  [33]<div>User form</div>
+  \t*[35]*<button aria-label='Submit form'>Submit</button>
+
+- Only elements with numeric indexes in [] are interactive
+- (stacked) indentation (with \t) is important and means that the element is a (html) child of the element above (with a lower index)
+- Elements with \* are new elements that were added after the previous step (if url has not changed)
+
+# Response Rules
+
+1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:
+   {"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
+   "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
+   "next_goal": "What needs to be done with the next immediate action"},
+   "action":[{"one_action_name": {// action-specific parameter}}, // ... more actions in sequence]}
+
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum 10 actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+5. TASK COMPLETION:
+
+- Use the done action as the last action as soon as the ultimate task is complete
+- Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps.
+- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completely finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
+- Don't hallucinate actions
+- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task.
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+8. Long tasks:
+
+- Keep track of the status and subresults in the memory.
+- You are provided with procedural memory summaries that condense previous task history (every N steps). Use these summaries to maintain context about completed actions, current progress, and next steps. The summaries appear in chronological order and contain key information about navigation history, findings, errors encountered, and current state. Refer to these summaries to avoid repeating actions and to ensure consistent progress toward the task goal.
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+
+Your responses must be always JSON with the specified format.
+
+ HumanMessage 
+Your ultimate task is: """
+你是一个专业的小红书数据采集助手，具备精确的元素定位能力。你的任务是采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**重要提示：相关性判断标准**
+不要只进行字面量匹配！要根据以下标准判断相关性：
+1. 行业相关性：属于同一个行业领域（教育培训、求职就业、考试备考等）
+2. 目标用户群体：面向相似的用户群体（求职者、备考人员、职场新人等）  
+3. 功能相关性：提供类似的服务或解决相似的问题（技能提升、职业规划、考试指导等）
+
+**🎯 任务目标：**
+采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**📋 相关性判断标准：**
+不要只进行字面量匹配！要根据语义相关性判断：
+- 行业相关：教育培训、求职就业、考试备考等
+- 用户群体：求职者、备考人员、职场新人等  
+- 功能相关：技能提升、职业规划、考试指导等
+
+**🔍 执行步骤：**
+1. Go to https://ad.xiaohongshu.com/, 使用邮箱:sensitive_data.xhs_ad_email, 密码:sensitive_data.xhs_ad_password 登录。
+2. 导航到: 数据 -> 笔记 -> 内容灵感页面, 使用 navigate_to_content_inspiration tool
+3. 获取当前页面核心笔记的所有标题，使用 get_core_note_titles tool
+4. 从当前页面所有核心笔记的标题中提取有相关性的标题，使用 extract_related_titles tool
+5. 使用 process_all_related_notes tool 批量处理所有相关标题的笔记详情，每个笔记执行：打开详情页 -> 提取数据 -> 关闭详情页的操作
+6. 使用 get_collection_status tool 查看当前采集进度和状态
+7. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理10页
+8. 最终使用 get_collection_status tool 获取完整的采集结果
+
+**⚠️ 重要约束：**
+- 如果某个action连续失败，请立即使用 get_collection_status 获取已采集的数据并输出结果
+- 不要无限重试失败的操作，优先保证已采集数据的完整性
+- 如果出现技术问题，请立即使用 get_collection_status 输出当前已采集的数据
+
+**最终输出格式：**
+请以结构化的JSON格式输出结果:
+
+{
+  "note_data_list": [
+    {
+      "note_title": 笔记标题,
+      "note_url": 完整URL, 
+      "impression": 曝光量数字,
+      "click": 阅读量数字,
+      "like": 点赞量数字,
+      "collect": 收藏量数字,
+      "comment": 评论量数字,
+      "engage": 互动量数字
+    }
+  ]
+}
+
+
+""". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.
+
+ HumanMessage 
+Example output:
+
+ AIMessage 
+
+
+ ToolMessage 
+Browser started
+
+ HumanMessage 
+[Your task history memory starts here]
+
+ AIMessage 
+{
+  "state_analysis": "Initial state detected: browser is on a blank page (about:blank) with no interactive elements. No actions have been taken yet for the Xiaohongshu data collection task.",
+  "progress_evaluation": "0% - Task has not started; login and navigation to target page pending.",
+  "challenges": [
+    "Unknown login page structure: Email/password fields and login button locations are undefined",
+    "Potential authentication errors if credentials are invalid or page structure changes"
+  ],
+  "next_steps": [
+    "Navigate to https://ad.xiaohongshu.com/ using the navigate tool",
+    "After page load, locate email/password fields and login button using interactive elements analysis",
+    "Enter credentials (sensitive_data.xhs_ad_email and sensitive_data.xhs_ad_password) and submit login"
+  ],
+  "reasoning": "The first critical step is accessing the platform. Starting with navigation to the login URL allows us to render the authentication interface. Subsequent credential input must rely on real-time element detection since field indices are unknown in the current blank state."
+}
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ HumanMessage 
+Action result: 🔗  Navigated to https://ad.xiaohongshu.com/
+
+ AIMessage 
+{
+  "state_analysis": "Currently on the Xiaohongshu ad platform login page (https://ad.xiaohongshu.com/). The initial navigation to the URL is complete, but login credentials have not been submitted yet. Interactive elements for login (phone/account login fields and verification options) are visible.",
+  "progress_evaluation": "5% - Initial navigation completed but authentication not performed. Core task of data collection hasn't started.",
+  "challenges": [
+    "Login may fail due to incorrect credentials or verification requirements",
+    "Page elements might change after login, requiring re-identification of navigation paths",
+    "Potential CAPTCHA or 2FA authentication not visible in current element list"
+  ],
+  "next_steps": [
+    "Use navigate_and_login_xiaohongshu_ad_platform tool with provided credentials (xhs_ad_email and xhs_ad_password)",
+    "Verify successful login by checking for dashboard elements or URL change",
+    "Proceed to navigate_to_content_inspiration tool after authentication"
+  ],
+  "reasoning": "Authentication is the critical prerequisite for accessing protected content inspiration pages. Using the dedicated login tool ensures proper credential handling. Verification of login success prevents errors in subsequent steps. Navigation to content inspiration must follow immediately after authentication to maintain workflow continuity."
+}
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ HumanMessage 
+Action error: 'NoneType' object is not iterable
+
+ AIMessage 
+{
+  "state_analysis": "Currently on Xiaohongshu ad platform login page with interactive elements visible. Previous action encountered a 'NoneType' iteration error, likely due to missing page elements during initial navigation. Login fields for phone/account login are present but email login option isn't visible in current elements.",
+  "progress_evaluation": "5% - Login page reached but authentication not completed. Core data collection steps cannot proceed without access to protected content inspiration section.",
+  "challenges": [
+    "Email login option not immediately visible in element list",
+    "Potential verification code requirement after credential submission",
+    "Risk of session timeouts during multi-page data collection"
+  ],
+  "next_steps": [
+    "Use navigate_and_login_xiaohongshu_ad_platform tool with credentials: xhs_ad_email=sensitive_data.xhs_ad_email, xhs_ad_password=sensitive_data.xhs_ad_password",
+    "Verify successful login by checking for dashboard UI elements",
+    "Execute navigate_to_content_inspiration tool immediately after authentication"
+  ],
+  "reasoning": "The specialized login tool handles credential input and authentication flow better than manual element interaction. Successful login is the critical gateway to accessing protected content inspiration data. Proceeding directly to content navigation after login maintains task momentum and avoids unnecessary element-level operations."
+}
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+open note detail card: 
+{open_note_detail_card: {'note_title': {'type': 'string'}}}
+close note detail card: 
+{close_note_detail_card: {}}
+click next page: 
+{click_next_page: {}}
+extract note data from modal: 
+{extract_note_data_from_modal: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ AIMessage 
+{
+  "state_analysis": "Login attempt succeeded according to action result, but current page elements still show login form with error '\u90ae\u7bb1\u683c\u5f0f\u4e0d\u6b63\u786e' (incorrect email format). URL remains https://ad.xiaohongshu.com/. This indicates potential discrepancy between action success status and actual page state.",
+  "progress_evaluation": "0% - Authentication status unclear; core data collection cannot proceed without confirmed access to content inspiration page.",
+  "challenges": [
+    "Login success reported but page shows email format error and login UI",
+    "Possible credential formatting issue or page redirection failure",
+    "Risk of infinite login attempts if root cause isn't resolved"
+  ],
+  "next_steps": [
+    "Verify login status by checking for dashboard elements using navigate_to_content_inspiration tool",
+    "If navigation fails, re-attempt login with manual email format check (ensure no extra spaces/special characters)",
+    "Use get_collection_status as fallback to assess if any data was captured during login process"
+  ],
+  "reasoning": "The conflicting signals (success message vs persistent login form) require immediate verification. Attempting direct navigation to content inspiration will confirm authentication status. If navigation fails, we must re-examine credentials before retrying login. get_collection_status provides a safety check for partial data recovery if workflow stalls."
+}
+
+ HumanMessage 
+[Task history memory ends]
+[Current state starts here]
+The following is one-time information - if you need to remember it write it to memory:
+Current url: https://ad.xiaohongshu.com/
+Available tabs:
+[TabInfo(page_id=0, url='https://ad.xiaohongshu.com/', title='小红书聚光-一站式广告投放平台', parent_page_id=None)]
+Interactive elements from top layer of the current page inside the viewport:
+[Start of page]
+[0]<h4 >聚光平台 />
+[1]<div  />
+	[2]<div  />
+	*[3]*<img  />
+	[4]<img  />
+	[5]<img  />
+[6]<img  />
+[7]<div >短信登录 />
+[8]<div >账号登录 />
+*[9]*<div  />
+	*[10]*<input name='email' type='text' placeholder='邮箱' />
+*[11]*<div  />
+	*[12]*<input placeholder='密码' type='password' name='password' />
+	*[13]*<div >忘记密码? />
+邮箱格式不正确
+*[14]*<button >登 录 />
+[15]<a >入驻指南 />
+[16]<a >人工咨询 />
+*[17]*<div  />
+	*[18]*<span  />
+*[19]*<span >我已阅读并同意 />
+*[20]*<a >《小红书商业产品服务合作协议》 />
+消息广场
+[21]<h6 >帮助中心 />
+[22]<div >聚光平台介绍 />
+[23]<div >信息流广告介绍 />
+[24]<div >广告管理指南 />
+[25]<div >聚光产品介绍 />
+[26]<div >搜索广告介绍 />
+[27]<div >基础投放操作 />
+[28]<h6 >最新资讯 />
+[29]<div >搜索直达|让种草转化提质增效 />
+[30]<div >品牌如何在小红书种出好生意 />
+[31]<h6 >开放平台 />
+[32]<div >开放平台入门指南 />
+[33]<div >Oauth2.0授权 />
+[34]<div >素材管理 />
+... 900 pixels below - scroll or extract content to see more ...
+Current step: 4/100Current date and time: 2025-06-22 14:58
+
+Action result 1/1: Successfully navigated and logged in to XiaoHongShu Ad Platform
+
+ RESPONSE
+{
+  "current_state": {
+    "evaluation_previous_goal": "Failed - The login attempt was unsuccessful due to an incorrect email format error. The page is still on the login screen, and the core task of data collection cannot proceed without successful authentication.",
+    "memory": "Attempted to log in using the navigate_and_login_xiaohongshu_ad_platform tool but encountered an email format error. 0 out of 10 pages processed. Need to resolve the login issue before proceeding.",
+    "next_goal": "Correct the email format and attempt to log in again."
+  },
+  "action": [
+    {
+      "navigate_and_login_xiaohongshu_ad_platform": {
+        "xhs_ad_email": "corrected_sensitive_data.xhs_ad_email",
+        "xhs_ad_password": "sensitive_data.xhs_ad_password"
+      }
+    }
+  ]
+}

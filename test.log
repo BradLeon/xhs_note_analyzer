@@ -1,0 +1,194 @@
+INFO     [browser_use.telemetry.service] Anonymized telemetry enabled. See https://docs.browser-use.com/development/telemetry for more information.
+🚀 开始启动Controller Action精确控制笔记采集...
+🎯 方案: browser_use + @controller.action + ActionStateManager状态管理 + 官方调试功能
+INFO     [__main__] 🎯 开始注册精确控制器的自定义action
+INFO     [__main__] 🔍 验证已注册的action:
+INFO     [__main__] 已注册的 action_key: done
+INFO     [__main__] 已注册的 action_value: name='done' description='Complete task - with return text and if the task is finished (success=True) or not yet  completely finished (success=False), because last step is reached' function=<function Controller.__init__.<locals>.done at 0x112d793a0> param_model=<class 'browser_use.controller.views.DoneAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: search_google
+INFO     [__main__] 已注册的 action_value: name='search_google' description='Search the query in Google, the query should be a search query like humans search in Google, concrete and not vague or super long.' function=<function Controller.__init__.<locals>.search_google at 0x112d794e0> param_model=<class 'browser_use.controller.views.SearchGoogleAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: go_to_url
+INFO     [__main__] 已注册的 action_value: name='go_to_url' description='Navigate to URL in the current tab' function=<function Controller.__init__.<locals>.go_to_url at 0x112d79620> param_model=<class 'browser_use.controller.views.GoToUrlAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: go_back
+INFO     [__main__] 已注册的 action_value: name='go_back' description='Go back' function=<function Controller.__init__.<locals>.go_back at 0x112d79760> param_model=<class 'browser_use.controller.views.NoParamsAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: wait
+INFO     [__main__] 已注册的 action_value: name='wait' description='Wait for x seconds default 3' function=<function Controller.__init__.<locals>.wait at 0x112d798a0> param_model=<class 'browser_use.controller.registry.service.wait_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: click_element_by_index
+INFO     [__main__] 已注册的 action_value: name='click_element_by_index' description='Click element by index' function=<function Controller.__init__.<locals>.click_element_by_index at 0x112d799e0> param_model=<class 'browser_use.controller.views.ClickElementAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: input_text
+INFO     [__main__] 已注册的 action_value: name='input_text' description='Input text into a input interactive element' function=<function Controller.__init__.<locals>.input_text at 0x112d79b20> param_model=<class 'browser_use.controller.views.InputTextAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: save_pdf
+INFO     [__main__] 已注册的 action_value: name='save_pdf' description='Save the current page as a PDF file' function=<function Controller.__init__.<locals>.save_pdf at 0x112d79c60> param_model=<class 'browser_use.controller.registry.service.save_pdf_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: switch_tab
+INFO     [__main__] 已注册的 action_value: name='switch_tab' description='Switch tab' function=<function Controller.__init__.<locals>.switch_tab at 0x112d79da0> param_model=<class 'browser_use.controller.views.SwitchTabAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: open_tab
+INFO     [__main__] 已注册的 action_value: name='open_tab' description='Open a specific url in new tab' function=<function Controller.__init__.<locals>.open_tab at 0x112d79ee0> param_model=<class 'browser_use.controller.views.OpenTabAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: close_tab
+INFO     [__main__] 已注册的 action_value: name='close_tab' description='Close an existing tab' function=<function Controller.__init__.<locals>.close_tab at 0x112d7a020> param_model=<class 'browser_use.controller.views.CloseTabAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: extract_content
+INFO     [__main__] 已注册的 action_value: name='extract_content' description='Extract page content to retrieve specific information from the page, e.g. all company names, a specific description, all information about xyc, 4 links with companies in structured format. Use include_links true if the goal requires links' function=<function Controller.__init__.<locals>.extract_content at 0x112d7a160> param_model=<class 'browser_use.controller.registry.service.extract_content_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: get_ax_tree
+INFO     [__main__] 已注册的 action_value: name='get_ax_tree' description='Get the accessibility tree of the page in the format "role name" with the number_of_elements to return' function=<function Controller.__init__.<locals>.get_ax_tree at 0x112d7a2a0> param_model=<class 'browser_use.controller.registry.service.get_ax_tree_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: scroll_down
+INFO     [__main__] 已注册的 action_value: name='scroll_down' description='Scroll down the page by pixel amount - if none is given, scroll one page' function=<function Controller.__init__.<locals>.scroll_down at 0x112d7a3e0> param_model=<class 'browser_use.controller.views.ScrollAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: scroll_up
+INFO     [__main__] 已注册的 action_value: name='scroll_up' description='Scroll up the page by pixel amount - if none is given, scroll one page' function=<function Controller.__init__.<locals>.scroll_up at 0x112d7a520> param_model=<class 'browser_use.controller.views.ScrollAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: send_keys
+INFO     [__main__] 已注册的 action_value: name='send_keys' description='Send strings of special keys like Escape,Backspace, Insert, PageDown, Delete, Enter, Shortcuts such as `Control+o`, `Control+Shift+T` are supported as well. This gets used in keyboard.press. ' function=<function Controller.__init__.<locals>.send_keys at 0x112d7a660> param_model=<class 'browser_use.controller.views.SendKeysAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: scroll_to_text
+INFO     [__main__] 已注册的 action_value: name='scroll_to_text' description='If you dont find something which you want to interact with, scroll to it' function=<function Controller.__init__.<locals>.scroll_to_text at 0x112d7a7a0> param_model=<class 'browser_use.controller.registry.service.scroll_to_text_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: get_dropdown_options
+INFO     [__main__] 已注册的 action_value: name='get_dropdown_options' description='Get all options from a native dropdown' function=<function Controller.__init__.<locals>.get_dropdown_options at 0x112d7a8e0> param_model=<class 'browser_use.controller.registry.service.get_dropdown_options_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: select_dropdown_option
+INFO     [__main__] 已注册的 action_value: name='select_dropdown_option' description='Select dropdown option for interactive element index by the text of the option you want to select' function=<function Controller.__init__.<locals>.select_dropdown_option at 0x112d7aa20> param_model=<class 'browser_use.controller.registry.service.select_dropdown_option_Params'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: drag_drop
+INFO     [__main__] 已注册的 action_value: name='drag_drop' description='Drag and drop elements or between coordinates on the page - useful for canvas drawing, sortable lists, sliders, file uploads, and UI rearrangement' function=<function Controller.__init__.<locals>.drag_drop at 0x112d7ab60> param_model=<class 'browser_use.controller.views.DragDropAction'> domains=None page_filter=None
+INFO     [__main__] 已注册的 action_key: read_sheet_contents
+INFO     [__main__] 已注册的 action_value: name='read_sheet_contents' description='Google Sheets: Get the contents of the entire sheet' function=<function Controller.__init__.<locals>.read_sheet_contents at 0x112d7aca0> param_model=<class 'browser_use.controller.registry.service.read_sheet_contents_Params'> domains=['https://docs.google.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: read_cell_contents
+INFO     [__main__] 已注册的 action_value: name='read_cell_contents' description='Google Sheets: Get the contents of a cell or range of cells' function=<function Controller.__init__.<locals>.read_cell_contents at 0x112d7ade0> param_model=<class 'browser_use.controller.registry.service.read_cell_contents_Params'> domains=['https://docs.google.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: update_cell_contents
+INFO     [__main__] 已注册的 action_value: name='update_cell_contents' description='Google Sheets: Update the content of a cell or range of cells' function=<function Controller.__init__.<locals>.update_cell_contents at 0x112d7af20> param_model=<class 'browser_use.controller.registry.service.update_cell_contents_Params'> domains=['https://docs.google.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: clear_cell_contents
+INFO     [__main__] 已注册的 action_value: name='clear_cell_contents' description='Google Sheets: Clear whatever cells are currently selected' function=<function Controller.__init__.<locals>.clear_cell_contents at 0x112d7b060> param_model=<class 'browser_use.controller.registry.service.clear_cell_contents_Params'> domains=['https://docs.google.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: select_cell_or_range
+INFO     [__main__] 已注册的 action_value: name='select_cell_or_range' description='Google Sheets: Select a specific cell or range of cells' function=<function Controller.__init__.<locals>.select_cell_or_range at 0x112d7b1a0> param_model=<class 'browser_use.controller.registry.service.select_cell_or_range_Params'> domains=['https://docs.google.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: fallback_input_into_single_selected_cell
+INFO     [__main__] 已注册的 action_value: name='fallback_input_into_single_selected_cell' description='Google Sheets: Fallback method to type text into (only one) currently selected cell' function=<function Controller.__init__.<locals>.fallback_input_into_single_selected_cell at 0x112d7b240> param_model=<class 'browser_use.controller.registry.service.fallback_input_into_single_selected_cell_Params'> domains=['https://docs.google.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: navigate_and_login_xiaohongshu_ad_platform
+INFO     [__main__] 已注册的 action_value: name='navigate_and_login_xiaohongshu_ad_platform' description='navigate and login xiaohongshu ad platform' function=<function create_precision_controller.<locals>.navigate_and_login_xiaohongshu_ad_platform at 0x112d7b420> param_model=<class 'browser_use.controller.registry.service.navigate_and_login_xiaohongshu_ad_platform_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: navigate_to_content_inspiration
+INFO     [__main__] 已注册的 action_value: name='navigate_to_content_inspiration' description='navigate to content inspiration page' function=<function create_precision_controller.<locals>.navigate_to_content_inspiration at 0x112d7b560> param_model=<class 'browser_use.controller.registry.service.navigate_to_content_inspiration_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: get_core_note_titles
+INFO     [__main__] 已注册的 action_value: name='get_core_note_titles' description='get_core_note_titles' function=<function create_precision_controller.<locals>.get_core_note_titles at 0x112d7b740> param_model=<class 'browser_use.controller.registry.service.get_core_note_titles_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: open_note_detail_card
+INFO     [__main__] 已注册的 action_value: name='open_note_detail_card' description='open note detail card' function=<function create_precision_controller.<locals>.open_note_detail_card at 0x112d7b880> param_model=<class 'browser_use.controller.registry.service.open_note_detail_card_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: close_note_detail_card
+INFO     [__main__] 已注册的 action_value: name='close_note_detail_card' description='close note detail card' function=<function create_precision_controller.<locals>.close_note_detail_card at 0x112d7b9c0> param_model=<class 'browser_use.controller.registry.service.close_note_detail_card_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: click_next_page
+INFO     [__main__] 已注册的 action_value: name='click_next_page' description='click next page' function=<function create_precision_controller.<locals>.click_next_page at 0x112d7bb00> param_model=<class 'browser_use.controller.registry.service.click_next_page_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: extract_note_data_from_modal
+INFO     [__main__] 已注册的 action_value: name='extract_note_data_from_modal' description='extract note data from modal' function=<function create_precision_controller.<locals>.extract_note_data_from_modal at 0x112d7bba0> param_model=<class 'browser_use.controller.registry.service.extract_note_data_from_modal_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: extract_related_titles
+INFO     [__main__] 已注册的 action_value: name='extract_related_titles' description='extract_related_titles' function=<function create_precision_controller.<locals>.extract_related_titles at 0x112d7bd80> param_model=<class 'browser_use.controller.registry.service.extract_related_titles_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: process_all_related_notes
+INFO     [__main__] 已注册的 action_value: name='process_all_related_notes' description='process_all_related_notes' function=<function create_precision_controller.<locals>.process_all_related_notes at 0x112d7bec0> param_model=<class 'browser_use.controller.registry.service.process_all_related_notes_Params'> domains=['ad.xiaohongshu.com'] page_filter=None
+INFO     [__main__] 已注册的 action_key: get_collection_status
+INFO     [__main__] 已注册的 action_value: name='get_collection_status' description='get_collection_status' function=<function create_precision_controller.<locals>.get_collection_status at 0x112d7bf60> param_model=<class 'browser_use.controller.registry.service.get_collection_status_Params'> domains=None page_filter=None
+INFO     [__main__] ✅ 控制器创建完成，共注册 36 个action
+WARNING  [browser_use.Agent✻b2f4 on ⛶b2f4.64] ⚠️ DeepSeek models do not support use_vision=True yet. Setting use_vision_for_planner=False for now...
+INFO     [browser_use.Agent✻b2f4 on ⛶b2f4.64] 🧠 Starting a browser-use agent 0.2.7 with base_model=qwen/qwen2.5-vl-72b-instruct +vision +memory extraction_model=qwen/qwen2.5-vl-72b-instruct planner_model=deepseek/deepseek-r1-0528 
+WARNING  [browser_use.Agent✻b2f4 on ⛶469e.64] ⚠️ Domain pattern "https://ad.xiaohongshu.com/" in sensitive_data is not covered by any pattern in allowed_domains=['https://*.xiaohongshu.com']
+   This may be a security risk as credentials could be used on unintended domains.
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.64] 💬 Saving conversation to ~/AI/xhs_note_analyzer/output/debug/conversation
+✅ Controller Action代理创建成功
+INFO     [__main__] 🗑️ 清除所有状态
+🗑️ 清理之前的状态数据
+🔄 开始执行Controller Action精确采集任务...
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.64] 🚀 Starting task: 
+你是一个专业的小红书数据采集助手，具备精确的元素定位能力。你的任务是采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**重要提示：相关性判断标准**
+不要只进行字面量匹配！要根据以下标准判断相关性：
+1. 行业相关性：属于同一个行业领域（教育培训、求职就业、考试备考等）
+2. 目标用户群体：面向相似的用户群体（求职者、备考人员、职场新人等）  
+3. 功能相关性：提供类似的服务或解决相似的问题（技能提升、职业规划、考试指导等）
+
+**🎯 任务目标：**
+采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**📋 相关性判断标准：**
+不要只进行字面量匹配！要根据语义相关性判断：
+- 行业相关：教育培训、求职就业、考试备考等
+- 用户群体：求职者、备考人员、职场新人等  
+- 功能相关：技能提升、职业规划、考试指导等
+
+**🔍 执行步骤：**
+1. Go to https://ad.xiaohongshu.com/, 等待登录成功。
+2. 导航到: 数据 -> 笔记 -> 内容灵感页面, 使用 navigate_to_content_inspiration tool
+3. 获取当前页面核心笔记的所有标题，使用 get_core_note_titles tool
+4. 从当前页面所有核心笔记的标题中提取有相关性的标题，使用 extract_related_titles tool
+5. 使用 process_all_related_notes tool 批量处理所有相关标题的笔记详情，每个笔记执行：打开详情页 -> 提取数据 -> 关闭详情页的操作
+6. 使用 get_collection_status tool 查看当前采集进度和状态
+7. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理10页
+8. 最终使用 get_collection_status tool 获取完整的采集结果
+
+**⚠️ 重要约束：**
+- 如果某个action连续失败，请立即使用 get_collection_status 获取已采集的数据并输出结果
+- 不要无限重试失败的操作，优先保证已采集数据的完整性
+- 如果出现技术问题，请立即使用 get_collection_status 输出当前已采集的数据
+
+**最终输出格式：**
+请以结构化的JSON格式输出结果:
+
+{
+  "note_data_list": [
+    {
+      "note_title": 笔记标题,
+      "note_url": 完整URL, 
+      "impression": 曝光量数字,
+      "click": 阅读量数字,
+      "like": 点赞量数字,
+      "collect": 收藏量数字,
+      "comment": 评论量数字,
+      "engage": 互动量数字
+    }
+  ]
+}
+
+
+
+INFO     [browser_use.BrowserSession⛶469e.64] 🌎 Launching new local browser playwright:chromium keep_alive=False user_data_dir= <incognito>
+INFO     [browser_use.BrowserSession⛶469e.64]  ↳ Spawned browser_pid=78632 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+INFO     [browser_use.BrowserSession⛶469e.64] 🍪 Loaded 216 cookies from storage_state= ./xiaohongshu_auth.json
+INFO     [browser_use.BrowserSession⛶469e.64] ➡️ Page navigation [0]about:blank used 0.0 KB in 0.51s
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 📍 Step 1: Evaluating page with 0 interactive elements on: about:blank
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] Planning Analysis:
+{
+    "state_analysis": "Initial state: browser is on a blank page with no interactive elements. No actions taken yet.",
+    "progress_evaluation": "0% - Task not started. No data collected or pages visited.",
+    "challenges": [
+        "Login dependency: Navigating to the ad platform requires manual login completion which cannot be automated",
+        "Potential navigation failures: Subsequent steps depend on successful login and page loading",
+        "Element identification: Future steps require precise element detection in dynamic pages"
+    ],
+    "next_steps": [
+        "Navigate to https://ad.xiaohongshu.com/ using the navigate tool",
+        "After navigation, use navigate_to_content_inspiration tool to access the content inspiration page"
+    ],
+    "reasoning": "The task must begin by accessing the target platform. Since login requires manual intervention, we prioritize reaching the login page first. The second step prepares for core note extraction once logged in, following the defined workflow sequence."
+}
+================================================================================
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 🧠 LLM call => ChatOpenAI [✉️ 8 msg, ~3884 tk, 39942 char, 📷 img] => JSON out + 🔨 21 tools (json_mode)
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] ❓ Eval: Unknown - The browser is on a blank page, and no actions have been taken yet.
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 🧠 Memory: 0 out of 10 pages analyzed. The task has not started. The current URL is about:blank, and there are no interactive elements available.
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 🎯 Next goal: Navigate to https://ad.xiaohongshu.com/
+
+INFO     [browser_use.controller.service] 🔗  Navigated to https://ad.xiaohongshu.com/
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] ☑️ Executed action 1/1: go_to_url(url='https://ad.xiaohongshu.com/')
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 📍 Step 2: Ran 1 actions in 40.79s: ✅ 1
+WARNING  [browser_use.BrowserSession⛶469e.64] ⚠️ Allowing agent to visit ad.xiaohongshu.com based on allowed_domains=['https://*.xiaohongshu.com', ...]. Set allowed_domains=['ad.xiaohongshu.com', ...] explicitly to avoid matching too many domains!
+INFO     [browser_use.BrowserSession⛶469e.64] ➡️ Page navigation [0]ad.xiaohongshu.com/aurora/ad/manage/camp… used 2791.0 KB in 5.06s
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 📍 Step 2: Evaluating page with 150 interactive elements on: https://ad.xiaohongshu.com/aurora/ad/manage/campai...
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] Planning Analysis:
+{
+    "state_analysis": "Currently on Xiaohongshu ad platform campaign management page. Login appears successful based on account balance display. Task progression: step 1 completed (navigation to platform), step 2 pending (navigation to content inspiration page).",
+    "progress_evaluation": "10% - Initial platform access achieved but core task steps not started. No data collected yet.",
+    "challenges": [
+        "Not yet on target page (\u5185\u5bb9\u7075\u611f) for data collection",
+        "Potential complexity in locating required navigation elements under '\u6570\u636e' tab"
+    ],
+    "next_steps": [
+        "Use navigate_to_content_inspiration tool to reach target page",
+        "Verify successful navigation to content inspiration page",
+        "Begin core note title extraction using get_core_note_titles"
+    ],
+    "reasoning": "The priority is reaching the content inspiration page as specified in step 2. Since login appears successful and we're already on the ad platform, directly navigating to the target page is the logical next step before any data collection can begin."
+}
+================================================================================
+INFO     [browser_use.Agent✻b2f4 on ⛶469e.24] 🧠 LLM call => ChatOpenAI [✉️ 13 msg, ~5574 tk, 470128 char, 📷 img] => JSON out + 🔨 30 tools (json_mode)
+
+
+🛑 SIGTERM received. Exiting immediately...
+
+

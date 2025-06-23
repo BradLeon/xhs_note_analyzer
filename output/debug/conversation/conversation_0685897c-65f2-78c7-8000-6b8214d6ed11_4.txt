@@ -1,0 +1,401 @@
+ SystemMessage 
+You are an AI agent designed to automate browser tasks. Your goal is to accomplish the ultimate task following the rules.
+
+# Input Format
+
+Task
+Previous steps
+Current URL
+Open Tabs
+Interactive Elements
+[index]<type>text</type>
+
+- index: Numeric identifier for interaction
+- type: HTML element type (button, input, etc.)
+- text: Element description
+  Example:
+  [33]<div>User form</div>
+  \t*[35]*<button aria-label='Submit form'>Submit</button>
+
+- Only elements with numeric indexes in [] are interactive
+- (stacked) indentation (with \t) is important and means that the element is a (html) child of the element above (with a lower index)
+- Elements with \* are new elements that were added after the previous step (if url has not changed)
+
+# Response Rules
+
+1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:
+   {"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
+   "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
+   "next_goal": "What needs to be done with the next immediate action"},
+   "action":[{"one_action_name": {// action-specific parameter}}, // ... more actions in sequence]}
+
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum 10 actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+5. TASK COMPLETION:
+
+- Use the done action as the last action as soon as the ultimate task is complete
+- Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps.
+- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completely finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
+- Don't hallucinate actions
+- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task.
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+8. Long tasks:
+
+- Keep track of the status and subresults in the memory.
+- You are provided with procedural memory summaries that condense previous task history (every N steps). Use these summaries to maintain context about completed actions, current progress, and next steps. The summaries appear in chronological order and contain key information about navigation history, findings, errors encountered, and current state. Refer to these summaries to avoid repeating actions and to ensure consistent progress toward the task goal.
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+
+Your responses must be always JSON with the specified format.
+
+ HumanMessage 
+Your ultimate task is: """
+你是一个专业的小红书数据采集助手，具备精确的元素定位能力。你的任务是采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**重要提示：相关性判断标准**
+不要只进行字面量匹配！要根据以下标准判断相关性：
+1. 行业相关性：属于同一个行业领域（教育培训、求职就业、考试备考等）
+2. 目标用户群体：面向相似的用户群体（求职者、备考人员、职场新人等）  
+3. 功能相关性：提供类似的服务或解决相似的问题（技能提升、职业规划、考试指导等）
+
+**🎯 任务目标：**
+采集与"国企央企求职辅导小程序"相关的优质热门笔记数据。
+
+**📋 相关性判断标准：**
+不要只进行字面量匹配！要根据语义相关性判断：
+- 行业相关：教育培训、求职就业、考试备考等
+- 用户群体：求职者、备考人员、职场新人等  
+- 功能相关：技能提升、职业规划、考试指导等
+
+**🔍 执行步骤：**
+1. Go to https://ad.xiaohongshu.com/
+2. 导航到: 数据 -> 笔记 -> 内容灵感页面, 使用 navigate_to_content_inspiration tool
+3. 获取当前页面核心笔记的所有标题，使用 get_core_note_titles tool
+4. 从当前页面所有核心笔记的标题中提取有相关性的标题，使用 extract_related_titles tool
+5. 使用 process_all_related_notes tool 批量处理所有相关标题的笔记详情，每个笔记执行：打开详情页 -> 提取数据 -> 关闭详情页的操作
+6. 使用 get_collection_status tool 查看当前采集进度和状态
+7. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理10页
+8. 最终使用 get_collection_status tool 获取完整的采集结果
+
+**⚠️ 重要约束：**
+- 如果某个action连续失败，请立即使用 get_collection_status 获取已采集的数据并输出结果
+- 不要无限重试失败的操作，优先保证已采集数据的完整性
+- 如果出现技术问题，请立即使用 get_collection_status 输出当前已采集的数据
+
+**最终输出格式：**
+请以结构化的JSON格式输出结果:
+
+{
+  "note_data_list": [
+    {
+      "note_title": 笔记标题,
+      "note_url": 完整URL, 
+      "impression": 曝光量数字,
+      "click": 阅读量数字,
+      "like": 点赞量数字,
+      "collect": 收藏量数字,
+      "comment": 评论量数字,
+      "engage": 互动量数字
+    }
+  ]
+}
+
+
+""". If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.
+
+ HumanMessage 
+Example output:
+
+ AIMessage 
+
+
+ ToolMessage 
+Browser started
+
+ HumanMessage 
+[Your task history memory starts here]
+
+ AIMessage 
+```json
+{
+  "state_analysis": "The agent has just started and the browser is initialized. The current URL is about:blank, and there are no interactive elements available on the page yet. The task is to collect data on Xiaohongshu notes related to \"国企央企求职辅导小程序\".",
+  "progress_evaluation": "0% - The task has not started yet. The initial setup of the browser is complete.",
+  "challenges": [
+    "No specific challenges identified yet as the task has not commenced.",
+    "The initial URL is 'about:blank', indicating that no website has been loaded yet. The first step requires navigating to a specific URL."
+  ],
+  "next_steps": [
+    "Navigate to https://ad.xiaohongshu.com/ using the `navigate_to` tool.",
+    "Once the page loads, proceed to the next step of navigating to the 'Data -> Notes -> Content Inspiration' page using the `navigate_to_content_inspiration` tool."
+  ],
+  "reasoning": "The ultimate goal requires starting by navigating to the specified website 'https://ad.xiaohongshu.com/'. After successfully loading the homepage, the next logical step according to the provided execution steps is to navigate to the 'Data -> Notes -> Content Inspiration' page. This will set up the environment for data collection."
+}
+```
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+click next page: 
+{click_next_page: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ HumanMessage 
+Action result: 🔗  Navigated to https://ad.xiaohongshu.com/
+
+ AIMessage 
+
+
+ ToolMessage 
+
+
+ HumanMessage 
+For this page, these additional actions are available:
+navigate and login xiaohongshu ad platform: 
+{navigate_and_login_xiaohongshu_ad_platform: {'xhs_ad_email': {'type': 'string'}, 'xhs_ad_password': {'type': 'string'}}}
+navigate to content inspiration page: 
+{navigate_to_content_inspiration: {}}
+get_core_note_titles: 
+{get_core_note_titles: {}}
+click next page: 
+{click_next_page: {}}
+extract_related_titles: 
+{extract_related_titles: {}}
+process_all_related_notes: 
+{process_all_related_notes: {}}
+
+ AIMessage 
+```json
+{
+  "state_analysis": "The agent has successfully navigated to the 'Content Inspiration' page on the Xiaohongshu ad platform. The page displays various metrics and categories related to content performance, including 'Core Notes' and 'Most Used Note Keywords'. The next step in the task is to get the core note titles.",
+  "progress_evaluation": "5% - The agent has successfully navigated to the correct page, which is the second step out of eight defined in the task. The actual data collection has not yet begun.",
+  "challenges": [
+    "The task requires extracting relevant notes based on semantic understanding, which might be challenging for the `extract_related_titles` tool if the keywords are not precise.",
+    "The ultimate goal is to collect data on '优质热门笔记' (high-quality popular notes). The current page provides metrics and keywords, but the direct identification of 'high-quality' notes needs to be inferred from the available data or through further processing."
+  ],
+  "next_steps": [
+    "Use the `get_core_note_titles` tool to retrieve the titles of the core notes from the current page.",
+    "After obtaining the titles, use the `extract_related_titles` tool to filter these titles based on relevance to '国企央企求职辅导小程序' using the provided criteria (industry, user group, function).",
+    "Once related titles are identified, use the `process_all_related_notes` tool to batch process the details of these notes."
+  ],
+  "reasoning": "The execution steps clearly indicate that after navigating to the content inspiration page, the next action is to 'get the current page core note titles'. Following this, the titles need to be filtered for relevance. Finally, the identified relevant notes need to be processed. Therefore, the suggested next steps directly align with the outlined execution flow to move towards the ultimate goal of data collection."
+}
+```
+
+ HumanMessage 
+[Task history memory ends]
+[Current state starts here]
+The following is one-time information - if you need to remember it write it to memory:
+Current url: https://ad.xiaohongshu.com/microapp/traffic-guide/contentInspiration/
+Available tabs:
+[TabInfo(page_id=0, url='https://ad.xiaohongshu.com/microapp/traffic-guide/contentInspiration/', title='内容灵感 - 流量参谋', parent_page_id=None)]
+Interactive elements from top layer of the current page inside the viewport:
+[Start of page]
+[0]<div >概览
+财务 />
+	[1]<div >推广 />
+	[2]<div >创意 />
+	[3]<div >数据 />
+	[4]<div >资产 />
+	[5]<div >工具 />
+[6]<div >搜索功能、计划名称、种草学、帮助文档... />
+[7]<button type='button' />
+	[8]<div  />
+		[9]<span  />
+			[10]<div  />
+[11]<div  />
+	[12]<span  />
+[13]<button type='button' />
+	[14]<div  />
+		[15]<span  />
+			[16]<span  />
+[17]<button type='button' />
+	[18]<div  />
+		[19]<span  />
+			[20]<div  />
+				[21]<span >琅琅前情-LR />
+[22]<button type='button' />
+	[23]<div  />
+		[24]<span >新建广告 />
+[25]<div  />
+[26]<div  />
+	[27]<span >0 />
+[28]<div  />
+	[29]<div  />
+[30]<h6 >内容灵感 />
+[31]<div >行业类目
+教育培训 / 职业教育 />
+	[32]<span  />
+[33]<div  />
+	[34]<div >近 7 日 />
+		[35]<span  />
+[36]<div  />
+	[37]<div  />
+	[38]<span >至 />
+	[39]<div  />
+	[40]<span  />
+[41]<div  />
+	[42]<div >营销诉求
+不限 />
+		[43]<span  />
+[44]<button type='button' />
+	[45]<div  />
+		[46]<span >查询 />
+[47]<button type='button' />
+	[48]<div  />
+		[49]<span >重置 />
+[50]<div  />
+	[51]<span >9 />
+	[52]<span >讲老师 />
+	[53]<span >49,436 />
+[54]<div  />
+	[55]<span >10 />
+	[56]<span >学生 />
+	[57]<span >41,493 />
+[58]<div  />
+	[59]<span >11 />
+	[60]<span >18岁 />
+	[61]<span >38,329 />
+[62]<div  />
+	[63]<span >12 />
+	[64]<span >教老师 />
+	[65]<span >32,895 />
+[66]<div  />
+	[67]<span >13 />
+	[68]<span >新手 />
+	[69]<span >30,725 />
+[70]<div  />
+	[71]<span >7 />
+[72]<div  />
+	[73]<span >帮改简历，面试拿到手软！ />
+	[74]<span  />
+[75]<div  />
+	[76]<span >复制 />
+[77]<div  />
+	[78]<span >8 />
+[79]<div  />
+	[80]<span >四款人气很高的三文鱼便当（附教程） />
+	[81]<span  />
+[82]<div  />
+	[83]<span >复制 />
+[84]<div  />
+	[85]<span >9 />
+[86]<div  />
+	[87]<span >旅管研一｜留给你薅羊毛的时间已经不多了⚠️ />
+	[88]<span  />
+[89]<div  />
+	[90]<span >复制 />
+[91]<div  />
+	[92]<span >10 />
+[93]<div  />
+	[94]<span >这些信号是宝宝上火？营养师妈妈在线支招 />
+	[95]<span  />
+[96]<div  />
+	[97]<span >复制 />
+[98]<h6 >核心笔记 />
+[99]<span >类别 />
+[100]<div >高曝光、高点击 />
+[101]<div >高阅读、高互动 />
+[102]<span >使用最多题材 />
+[103]<span  />
+	[104]<span >经验教程 />
+[105]<span  />
+	[106]<span >单品推荐 />
+[107]<span  />
+	[108]<span >生活剧情 />
+[109]<span >使用最多形式 />
+[110]<span  />
+	[111]<span >图文 />
+[112]<span >使用最多笔记关键词 />
+[113]<span  />
+	[114]<span >老师 />
+[115]<span  />
+	[116]<span >教老师 />
+[117]<span  />
+	[118]<span >老师人 />
+[119]<div >下班日记｜生活忙忙碌碌，总要有所期待🫶
+|
+2025-06-12 />
+	[120]<div  />
+[121]<div >体制内已考完四类有用的证✌️ 花呗都提额了
+|
+2025-06-17 />
+	[122]<div  />
+[123]<div >焦虑洪流中的“异类”
+|
+2025-05-26 />
+	[124]<div  />
+[125]<div >不管了！25下半年事业单位我先冲了
+|
+2025-06-07 />
+	[126]<div  />
+[127]<div >死磕这两种笔记，我不信你做不好这个自媒体
+|
+2025-06-01 />
+	[128]<div  />
+[End of page]
+Current step: 3/100Current date and time: 2025-06-23 07:55
+
+Action result 1/1: Successfully navigated to content inspiration page
+
+ RESPONSE
+{
+  "current_state": {
+    "evaluation_previous_goal": "Success - The agent has successfully navigated to the content inspiration page. The current URL is https://ad.xiaohongshu.com/microapp/traffic-guide/contentInspiration/.",
+    "memory": "1. Navigated to https://ad.xiaohongshu.com/. \n2. Navigated to the 'Data -> Notes -> Content Inspiration' page. \n0 out of 10 pages processed.",
+    "next_goal": "Get the core note titles from the current page."
+  },
+  "action": [
+    {
+      "get_core_note_titles": {}
+    }
+  ]
+}
