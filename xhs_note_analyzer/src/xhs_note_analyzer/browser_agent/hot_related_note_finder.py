@@ -26,6 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class NoteData(BaseModel):
+    note_id: str = ""  # 笔记ID
     note_title: str
     note_url: str
     impression: int  # 总曝光量
@@ -871,9 +872,20 @@ async def main():
             note_list = []
             for note_data in collected_notes_data:
                 try:
+                    # 从URL提取note_id
+                    note_url = note_data.get("note_url", "")
+                    note_id = ""
+                    if note_url:
+                        # 简单的note_id提取逻辑
+                        if "/note/" in note_url:
+                            note_id = note_url.split("/note/")[-1].split("?")[0]
+                        elif "/explore/" in note_url:
+                            note_id = note_url.split("/explore/")[-1].split("?")[0]
+                    
                     note = NoteData(
+                        note_id=note_id,
                         note_title=note_data.get("note_title", ""),
-                        note_url=note_data.get("note_url", ""),
+                        note_url=note_url,
                         impression=note_data.get("impression", 0),
                         click=note_data.get("click", 0),
                         like=note_data.get("like", 0),

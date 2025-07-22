@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__n8n-local__activate_workflow",
+      "mcp__n8n-local__update_workflow"
+    ],
+    "deny": []
+  }
+}

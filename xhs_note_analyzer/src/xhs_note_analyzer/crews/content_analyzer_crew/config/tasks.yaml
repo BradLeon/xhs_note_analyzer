@@ -1,0 +1,254 @@
+analyze_content_structure:
+  description: >
+    对小红书笔记进行深度的内容结构分析，具体分析以下维度：
+    
+    1. **标题分析**：
+       - 标题套路和模板识别（如：数字型、疑问型、对比型、情感型）
+       - 关键词布局和SEO优化策略
+       - 标题情感倾向和心理暗示
+    
+    2. **开头策略分析**：
+       - 开头钩子类型（悬念、痛点、数据、故事、问题等）
+       - 开头冲击力和吸引力评估
+       - 用户注意力捕获机制
+    
+    3. **正文框架分析**：
+       - 内容逻辑结构（总分总、递进式、对比式等）
+       - 段落组织和信息层次
+       - 论证方式和说服力构建
+    
+    4. **结尾技巧分析**：
+       - 结尾类型（总结型、互动型、悬念型、行动召唤型）
+       - CTA设计和用户引导策略
+       - 情感共鸣和记忆点营造
+    
+    **输出要求**：
+    - 提供结构化的分析结果，包含具体的套路识别和改进建议
+    - 给出内容结构的完整性和可读性评分
+    - 总结可复制的结构模板和写作公式
+    
+    **分析内容**：
+    笔记ID: {note_id}
+    笔记标题: {note_title}  
+    笔记内容: {note_content}
+    图片信息: {note_images}
+    互动数据: 点赞{like_count}, 收藏{collect_count}, 评论{comment_count}
+
+  expected_output: >
+    返回一个详细的内容结构分析JSON对象，包含：
+    - title_pattern: 标题套路分析
+    - title_keywords: 标题关键词列表
+    - title_emotion: 标题情感倾向
+    - opening_strategy: 开头策略描述
+    - opening_hook: 开头钩子类型
+    - opening_impact: 开头冲击力评估
+    - content_framework: 正文框架类型
+    - content_logic: 内容逻辑层次列表
+    - paragraph_structure: 段落结构特点
+    - ending_technique: 结尾技巧类型
+    - ending_cta: 行动召唤内容
+    - ending_resonance: 结尾共鸣度评估
+    - word_count: 字数统计
+    - readability_score: 可读性评分
+    - structure_completeness: 结构完整性评估
+
+  agent: content_structure_analyst
+
+analyze_emotional_value:
+  description: >
+    对小红书笔记进行深度的情感价值分析，具体分析以下维度：
+    
+    1. **痛点挖掘分析**：
+       - 识别内容触及的用户痛点和焦虑点
+       - 评估痛点描述的具体性和共鸣度
+       - 分析痛点与目标用户需求的匹配度
+    
+    2. **价值主张分析**：
+       - 提取核心价值承诺和利益点
+       - 分析价值层次和优先级排序
+       - 评估价值主张的差异化和吸引力
+    
+    3. **情感触发分析**：
+       - 识别情感触发器类型（恐惧、欲望、骄傲、归属感等）
+       - 分析情感强度和感染力
+       - 评估情感与理性的平衡
+    
+    4. **可信度建设分析**：
+       - 识别权威性信号和专业性体现
+       - 分析社会证明和成功案例使用
+       - 评估可信度建立的有效性
+    
+    5. **心理驱动分析**：
+       - 紧迫感和稀缺性营造
+       - 损失厌恶和获得期望的利用
+       - 从众心理和社会认同的激发
+    
+    **输出要求**：
+    - 提供具体的情感价值元素识别和效果评估
+    - 分析情感驱动的层次和逻辑
+    - 给出情感价值优化的具体建议
+    
+    **分析内容**：
+    笔记ID: {note_id}
+    笔记标题: {note_title}
+    笔记内容: {note_content}
+    作者信息: {author_info}
+    互动数据: 点赞{like_count}, 收藏{collect_count}, 评论{comment_count}
+
+  expected_output: >
+    返回一个详细的情感价值分析JSON对象，包含：
+    - pain_points: 痛点挖掘列表
+    - pain_intensity: 痛点强度评估
+    - value_propositions: 价值主张列表
+    - value_hierarchy: 价值层次排序
+    - emotional_triggers: 情感触发器列表
+    - emotional_intensity: 情感强度评估
+    - credibility_signals: 可信度信号列表
+    - authority_indicators: 权威性指标列表
+    - urgency_indicators: 紧迫感指标列表
+    - social_proof: 社会证明列表
+    - scarcity_elements: 稀缺性元素列表
+    - benefit_appeals: 利益点吸引列表
+    - transformation_promise: 转变承诺描述
+
+  agent: emotional_value_analyst
+
+analyze_visual_elements:
+  description: >
+    对小红书笔记进行全面的视觉元素分析，具体分析以下维度：
+    
+    1. **图片基础分析**：
+       - 图片数量、质量和清晰度评估
+       - 图片内容和主题的关联度
+       - 图片构图和拍摄技巧分析
+    
+    2. **视觉风格分析**：
+       - 图片风格定位（清新、复古、商务、可爱等）
+       - 色彩方案和色彩心理学应用
+       - 整体视觉调性和品牌一致性
+    
+    3. **排版设计分析**：
+       - 布局设计和视觉层次构建
+       - 文字与图片的搭配关系
+       - 留白和平衡感的运用
+    
+    4. **用户体验分析**：
+       - 首图吸引力和滑动停留力
+       - 视觉叙事的连贯性和逻辑性
+       - 移动端查看体验和适配性
+    
+    5. **品牌识别分析**：
+       - 个人风格和品牌元素
+       - 视觉差异化和记忆点
+       - 专业性和美观度平衡
+    
+    **输出要求**：
+    - 提供专业的视觉设计评估和改进建议
+    - 分析视觉元素对用户体验的影响
+    - 总结可复制的视觉设计规律
+    
+    **分析内容**：
+    笔记ID: {note_id}
+    笔记标题: {note_title}
+    图片信息: {note_images}
+    图片数量: {image_count}
+    作者信息: {author_info}
+    互动数据: 点赞{like_count}, 收藏{collect_count}, 评论{comment_count}
+
+  expected_output: >
+    返回一个详细的视觉元素分析JSON对象，包含：
+    - image_count: 图片数量
+    - image_quality: 图片质量评估
+    - image_style: 图片风格定位
+    - color_scheme: 色彩方案分析
+    - visual_tone: 视觉调性评估
+    - layout_style: 排版风格描述
+    - text_overlay: 文字覆盖情况
+    - visual_hierarchy: 视觉层次分析
+    - brand_consistency: 品牌一致性评估
+    - personal_style: 个人风格特点
+    - thumbnail_appeal: 首图吸引力分析
+    - visual_storytelling: 视觉叙事评估
+    - scroll_stopping_power: 滑动停留力评估
+
+  agent: visual_element_analyst
+
+coordinate_content_analysis:
+  description: >
+    统筹协调三个维度的分析结果，生成专业的Markdown格式分析报告：
+    
+    1. **综合评估**：
+       - 整合内容结构、情感价值、视觉元素三个维度的分析结果
+       - 计算内容综合评分和各维度权重
+       - 识别内容成功的关键要素和短板
+    
+    2. **模式识别**：
+       - 总结内容成功的核心规律和公式
+       - 识别可复制的模板和套路
+       - 分析不同类型内容的差异化策略
+    
+    3. **优化建议**：
+       - 提供结构化的改进建议和优化方向
+       - 给出具体可操作的执行步骤
+       - 预估优化效果和实施难度
+    
+    4. **复制指南**：
+       - 提炼可复制的成功要素和方法论
+       - 设计适合不同场景的应用模板
+       - 制定内容创作的标准化流程
+    
+    **输出要求**：
+    - 生成专业的Markdown格式报告，包含标题、目录、分析详情
+    - 使用清晰的标题层级和格式化
+    - 包含表格、列表、引用等Markdown元素
+    - 确保报告的可读性和专业性
+    
+    **输入数据**：
+    - 内容结构分析结果
+    - 情感价值分析结果  
+    - 视觉元素分析结果
+    - 笔记基础信息和互动数据
+
+  expected_output: >
+    返回一个完整的Markdown格式内容分析报告，包含：
+    
+    # 小红书内容深度分析报告
+    
+    ## 📊 分析概览
+    - 笔记基本信息
+    - 综合评分
+    - 各维度得分
+    
+    ## 🔍 三维度详细分析
+    
+    ### 1. 内容结构分析
+    - 标题套路和策略
+    - 开头、正文、结尾分析
+    - 结构完整性评估
+    
+    ### 2. 情感价值分析  
+    - 痛点挖掘和价值主张
+    - 情感触发机制
+    - 可信度建设策略
+    
+    ### 3. 视觉元素分析
+    - 图片风格和色彩方案
+    - 排版设计特点
+    - 视觉吸引力评估
+    
+    ## 🎯 成功要素总结
+    - 核心成功因子
+    - 可复制的模式
+    - 差异化优势
+    
+    ## 💡 优化建议
+    - 具体改进方向
+    - 实施优先级
+    - 预期效果评估
+    
+    ## 📋 应用模板
+    - 创作公式
+    - 标准化流程
+    - 最佳实践指南
+
+  agent: content_analysis_coordinator

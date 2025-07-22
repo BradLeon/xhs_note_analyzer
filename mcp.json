@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "control-mac": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mac-control-mcp"],
+      "description": "Control your Mac through AppleScript automation"
+    }
+  }
+}

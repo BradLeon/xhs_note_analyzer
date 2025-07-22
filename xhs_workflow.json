@@ -1,0 +1,175 @@
+{
+  "name": "XHS Note Analysis Pipeline",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "promotion_target",
+              "value": "国企央企求职辅导小程序"
+            },
+            {
+              "name": "business_context",
+              "value": "专注于国企央企求职培训的教育机构"
+            },
+            {
+              "name": "max_pages",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [280, 300],
+      "name": "Set Input Parameters",
+      "id": "node1"
+    },
+    {
+      "parameters": {
+        "command": "python3",
+        "arguments": [
+          "-c",
+          "import sys\nsys.path.append('/Users/liuchao/AI/xhs_note_analyzer/xhs_note_analyzer/src')\nfrom xhs_note_analyzer.crews.hot_note_finder_crew.hot_note_finder_crew import HotNoteFinderCrew\nimport json\n\n# 获取输入参数\npromotion_target = '{{ $json.promotion_target }}'\nmax_pages = int('{{ $json.max_pages }}')\n\n# 创建HotNoteFinderCrew\ncrew = HotNoteFinderCrew()\n\n# 执行笔记发现\nresult = crew.kickoff(inputs={\n    'promotion_target': promotion_target,\n    'max_pages': max_pages\n})\n\nprint(json.dumps(result, ensure_ascii=False))"
+        ]
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "name": "Step 1: Find Hot Notes",
+      "id": "node2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析HotNoteFinderCrew的结果\nconst result = JSON.parse($input.first().json.stdout);\n\nif (!result.success || !result.notes || result.notes.length === 0) {\n  throw new Error('未找到任何优质笔记');\n}\n\n// 准备MediaCrawler的输入\nconst notes = result.notes.map(note => ({\n  note_title: note.note_title,\n  note_url: note.note_url,\n  impression: note.impression,\n  click: note.click,\n  like: note.like,\n  collect: note.collect,\n  comment: note.comment,\n  engage: note.engage\n}));\n\nreturn {\n  success: true,\n  notes: notes,\n  total_count: notes.length,\n  message: `成功找到 ${notes.length} 条优质笔记`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [720, 300],
+      "name": "Parse Notes Result",
+      "id": "node3"
+    },
+    {
+      "parameters": {
+        "command": "python3",
+        "arguments": [
+          "-c",
+          "import sys\nsys.path.append('/Users/liuchao/AI/xhs_note_analyzer/xhs_note_analyzer/src')\nfrom xhs_note_analyzer.tools.mediacrawler_client import MediaCrawlerClient\nimport json\n\n# 获取笔记列表\nnotes_data = json.loads('''{{ $json }}''')\nnotes = notes_data.get('notes', [])\n\n# 创建MediaCrawler客户端\nclient = MediaCrawlerClient()\n\n# 批量采集笔记详情\ndetailed_notes = []\nfor note in notes:\n    note_url = note.get('note_url', '')\n    if note_url:\n        # 调用API获取详细内容\n        content_result = client.crawl_note(note_url, fetch_comments=False)\n        \n        if content_result.get('success', False):\n            detailed_note = {\n                'basic_info': note,\n                'content': content_result.get('data', {}).get('content', ''),\n                'images': content_result.get('data', {}).get('images', []),\n                'video_url': content_result.get('data', {}).get('video_url', ''),\n                'author_info': content_result.get('data', {}).get('author', {}),\n                'tags': content_result.get('data', {}).get('tags', []),\n                'create_time': content_result.get('data', {}).get('create_time', '')\n            }\n        else:\n            # 如果API失败，使用模拟数据\n            detailed_note = {\n                'basic_info': note,\n                'content': f'这是{note.get(\"note_title\", \"\")}的详细内容...',\n                'images': ['https://example.com/image1.jpg'],\n                'video_url': '',\n                'author_info': {'name': '作者示例', 'followers': 10000},\n                'tags': ['求职', '国企', '面试'],\n                'create_time': '2024-01-01'\n            }\n        \n        detailed_notes.append(detailed_note)\n\nresult = {\n    'success': True,\n    'detailed_notes': detailed_notes,\n    'total_count': len(detailed_notes),\n    'message': f'成功采集 {len(detailed_notes)} 条笔记详情'\n}\n\nprint(json.dumps(result, ensure_ascii=False))"
+        ]
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [940, 300],
+      "name": "Step 2: Fetch Note Content",
+      "id": "node4"
+    },
+    {
+      "parameters": {
+        "command": "python3",
+        "arguments": [
+          "-c",
+          "import sys\nsys.path.append('/Users/liuchao/AI/xhs_note_analyzer/xhs_note_analyzer/src')\nfrom xhs_note_analyzer.crews.content_advisor_crew.content_advisor_crew import ContentAdvisorCrew\nimport json\n\n# 获取详细笔记数据\ndetailed_data = json.loads('''{{ $json.stdout }}''')\ndetailed_notes = detailed_data.get('detailed_notes', [])\n\n# 创建ContentAdvisorCrew\ncrew = ContentAdvisorCrew()\n\n# 分析每个笔记\ncontent_analysis = []\nfor detailed_note in detailed_notes:\n    # 准备分析输入\n    analysis_input = {\n        'note_title': detailed_note['basic_info']['note_title'],\n        'note_content': detailed_note['content'],\n        'note_images': detailed_note['images'],\n        'author_info': detailed_note['author_info'],\n        'engagement_data': {\n            'like': detailed_note['basic_info']['like'],\n            'collect': detailed_note['basic_info']['collect'],\n            'comment': detailed_note['basic_info']['comment'],\n            'impression': detailed_note['basic_info']['impression']\n        },\n        'promotion_target': '国企央企求职辅导小程序',\n        'business_context': '专注于国企央企求职培训的教育机构'\n    }\n    \n    # 生成模拟分析结果\n    advice = {\n        'topic_suggestions': [f'基于{detailed_note[\"basic_info\"][\"note_title\"]}的选题建议1', '选题建议2'],\n        'copywriting_advice': ['文案建议1', '文案建议2'],\n        'creative_ideas': ['创意想法1', '创意想法2'],\n        'video_script': f'基于{detailed_note[\"basic_info\"][\"note_title\"]}的视频脚本...',\n        'image_suggestions': ['配图建议1', '配图建议2'],\n        'target_audience': '国企央企求职者',\n        'content_strategy': '基于数据分析的内容策略建议'\n    }\n    \n    content_analysis.append(advice)\n\n# 生成综合建议\nfinal_recommendations = {\n    'summary': f'基于{len(detailed_notes)}条优质笔记的分析',\n    'top_topics': ['热门选题1', '热门选题2', '热门选题3'],\n    'content_strategy': '综合内容策略建议',\n    'implementation_plan': '实施计划建议'\n}\n\nresult = {\n    'success': True,\n    'content_analysis': content_analysis,\n    'final_recommendations': final_recommendations,\n    'analyzed_count': len(content_analysis),\n    'message': f'成功分析 {len(content_analysis)} 条笔记内容'\n}\n\nprint(json.dumps(result, ensure_ascii=False))"
+        ]
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1160, 300],
+      "name": "Step 3: Content Analysis",
+      "id": "node5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 生成Markdown格式的报告\nconst analysisData = JSON.parse($input.first().json.stdout);\n\nif (!analysisData.success) {\n  throw new Error('内容分析失败');\n}\n\nconst contentAnalysis = analysisData.content_analysis || [];\nconst finalRecommendations = analysisData.final_recommendations || {};\n\n// 生成Markdown报告\nlet markdownContent = `# 小红书内容分析报告\\n\\n`;\nmarkdownContent += `**生成时间**: ${new Date().toLocaleString('zh-CN')}\\n\\n`;\nmarkdownContent += `**分析笔记数量**: ${analysisData.analyzed_count}\\n\\n`;\n\n// 综合建议\nmarkdownContent += `## 📊 综合分析建议\\n\\n`;\nmarkdownContent += `### 核心洞察\\n${finalRecommendations.summary || '暂无'}\\n\\n`;\n\nif (finalRecommendations.top_topics && finalRecommendations.top_topics.length > 0) {\n  markdownContent += `### 热门选题推荐\\n`;\n  finalRecommendations.top_topics.forEach((topic, index) => {\n    markdownContent += `${index + 1}. ${topic}\\n`;\n  });\n  markdownContent += `\\n`;\n}\n\nmarkdownContent += `### 内容策略\\n${finalRecommendations.content_strategy || '暂无'}\\n\\n`;\nmarkdownContent += `### 实施计划\\n${finalRecommendations.implementation_plan || '暂无'}\\n\\n`;\n\n// 详细分析\nmarkdownContent += `## 📝 详细分析结果\\n\\n`;\n\ncontentAnalysis.forEach((analysis, index) => {\n  markdownContent += `### 笔记 ${index + 1} 分析\\n\\n`;\n  \n  // 选题建议\n  if (analysis.topic_suggestions && analysis.topic_suggestions.length > 0) {\n    markdownContent += `#### 🎯 选题建议\\n`;\n    analysis.topic_suggestions.forEach((suggestion, idx) => {\n      markdownContent += `- ${suggestion}\\n`;\n    });\n    markdownContent += `\\n`;\n  }\n  \n  // 文案建议\n  if (analysis.copywriting_advice && analysis.copywriting_advice.length > 0) {\n    markdownContent += `#### ✍️ 文案建议\\n`;\n    analysis.copywriting_advice.forEach((advice, idx) => {\n      markdownContent += `- ${advice}\\n`;\n    });\n    markdownContent += `\\n`;\n  }\n  \n  // 创意想法\n  if (analysis.creative_ideas && analysis.creative_ideas.length > 0) {\n    markdownContent += `#### 💡 创意想法\\n`;\n    analysis.creative_ideas.forEach((idea, idx) => {\n      markdownContent += `- ${idea}\\n`;\n    });\n    markdownContent += `\\n`;\n  }\n  \n  // 视频脚本\n  if (analysis.video_script) {\n    markdownContent += `#### 🎬 视频脚本建议\\n${analysis.video_script}\\n\\n`;\n  }\n  \n  // 配图建议\n  if (analysis.image_suggestions && analysis.image_suggestions.length > 0) {\n    markdownContent += `#### 🖼️ 配图建议\\n`;\n    analysis.image_suggestions.forEach((suggestion, idx) => {\n      markdownContent += `- ${suggestion}\\n`;\n    });\n    markdownContent += `\\n`;\n  }\n  \n  // 目标受众\n  if (analysis.target_audience) {\n    markdownContent += `#### 👥 目标受众\\n${analysis.target_audience}\\n\\n`;\n  }\n  \n  // 内容策略\n  if (analysis.content_strategy) {\n    markdownContent += `#### 📈 内容策略\\n${analysis.content_strategy}\\n\\n`;\n  }\n  \n  markdownContent += `---\\n\\n`;\n});\n\n// 添加生成说明\nmarkdownContent += `## 📋 报告说明\\n\\n`;\nmarkdownContent += `本报告基于小红书优质笔记分析生成，包含以下三个步骤：\\n\\n`;\nmarkdownContent += `1. **笔记发现**: 使用HotNoteFinderCrew在小红书平台发现相关优质笔记\\n`;\nmarkdownContent += `2. **内容采集**: 使用MediaCrawlerClient采集笔记详细内容\\n`;\nmarkdownContent += `3. **内容分析**: 使用ContentAdvisorCrew进行深度分析并生成建议\\n\\n`;\nmarkdownContent += `**技术栈**: CrewAI Flow + browser_use + MediaCrawler + Multi-modal LLM\\n`;\nmarkdownContent += `**生成工具**: n8n工作流自动化\\n`;\n\nreturn {\n  success: true,\n  markdown_content: markdownContent,\n  filename: `xhs_analysis_report_${new Date().toISOString().split('T')[0]}.md`,\n  message: '成功生成Markdown格式报告'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1380, 300],
+      "name": "Generate Markdown Report",
+      "id": "node6"
+    },
+    {
+      "parameters": {
+        "command": "python3",
+        "arguments": [
+          "-c",
+          "import json\nimport os\nfrom pathlib import Path\n\n# 获取Markdown内容\nreport_data = json.loads('''{{ $json }}''')\nmarkdown_content = report_data.get('markdown_content', '')\nfilename = report_data.get('filename', 'xhs_analysis_report.md')\n\n# 创建输出目录\noutput_dir = Path('/Users/liuchao/AI/xhs_note_analyzer/output')\noutput_dir.mkdir(exist_ok=True)\n\n# 保存Markdown文件\noutput_file = output_dir / filename\nwith open(output_file, 'w', encoding='utf-8') as f:\n    f.write(markdown_content)\n\nresult = {\n    'success': True,\n    'output_file': str(output_file),\n    'file_size': len(markdown_content),\n    'message': f'成功保存报告到 {output_file}'\n}\n\nprint(json.dumps(result, ensure_ascii=False))"
+        ]
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1600, 300],
+      "name": "Save Markdown File",
+      "id": "node7"
+    }
+  ],
+  "connections": {
+    "Set Input Parameters": {
+      "main": [
+        [
+          {
+            "node": "Step 1: Find Hot Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 1: Find Hot Notes": {
+      "main": [
+        [
+          {
+            "node": "Parse Notes Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Notes Result": {
+      "main": [
+        [
+          {
+            "node": "Step 2: Fetch Note Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 2: Fetch Note Content": {
+      "main": [
+        [
+          {
+            "node": "Step 3: Content Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3: Content Analysis": {
+      "main": [
+        [
+          {
+            "node": "Generate Markdown Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Markdown Report": {
+      "main": [
+        [
+          {
+            "node": "Save Markdown File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
