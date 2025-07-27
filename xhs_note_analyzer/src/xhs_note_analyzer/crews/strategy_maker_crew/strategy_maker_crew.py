@@ -32,10 +32,13 @@ from .models import (
     StrategyReport
 )
 
-# Import for type checking
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
+# Import ContentAnalysisReport
+try:
     from xhs_note_analyzer.crews.content_analyzer_crew.models import ContentAnalysisReport
+except ImportError:
+    # 如果导入失败，创建一个临时的类型定义
+    from typing import Any
+    ContentAnalysisReport = Any
 
 logger = logging.getLogger(__name__)
 

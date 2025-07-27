@@ -31,9 +31,12 @@ from .models import (
 )
 
 # Import NoteContentData from main module
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
+try:
     from xhs_note_analyzer.main import NoteContentData
+except ImportError:
+    # 如果导入失败，创建一个临时的类型定义
+    from typing import Any
+    NoteContentData = Any
 
 logger = logging.getLogger(__name__)
 

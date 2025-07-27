@@ -15,7 +15,6 @@ from .models import (
     ContentStructureAnalysis, 
     EmotionalValueAnalysis,
     VisualElementAnalysis,
-    EngagementMechanismAnalysis,
     ContentAnalysisReport
 )
 
@@ -26,6 +25,5 @@ __all__ = [
     'ContentStructureAnalysis',
     'EmotionalValueAnalysis', 
     'VisualElementAnalysis',
-    'EngagementMechanismAnalysis',
     'ContentAnalysisReport'
 ]

@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import PromptTemplate
 from playwright.async_api import Page
-from crewai_tools import BaseTool
+from crewai.tools import BaseTool
 import re
 
 # 配置详细日志
@@ -52,11 +52,21 @@ class ToolExecutionResult(BaseModel):
     debug_info: Dict[str, Any] = Field(default_factory=dict, description="调试信息")
 
 class ActionStateManager:
-    """Action之间的状态管理器，解决参数传递问题"""
+    """Action之间的状态管理器，解决参数传递问题 - 单例模式"""
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
     def __init__(self):
-        self.state = {}
-        self.execution_log = []
-        self.note_detail_parsed = {}
+        if not ActionStateManager._initialized:
+            self.state = {}
+            self.execution_log = []
+            self.note_detail_parsed = {}
+            ActionStateManager._initialized = True
     
     def set_data(self, key: str, value: Any, description: str = ""):
         """设置状态数据"""
@@ -67,11 +77,12 @@ class ActionStateManager:
             "description": description,
             "timestamp": asyncio.get_event_loop().time()
         })
+        logger.info(f"🐛 DEBUG: 设置状态 {key} = '{value}', 实例ID: {id(self)}, 描述: {description}")
     
     def get_data(self, key: str, default=None):
         """获取状态数据"""
         value = self.state.get(key, default)
-        logger.info(f"🔍 状态获取: {key} = {type(value)}")
+        logger.info(f"🐛 DEBUG: 获取状态 {key} = '{value}', 实例ID: {id(self)}, 当前状态keys: {list(self.state.keys())}")
         return value
     
     def set_note_detail_parsed(self, key: str, value: bool):
@@ -101,6 +112,55 @@ class ActionStateManager:
             "current_state_keys": list(self.state.keys()),
             "execution_log": self.execution_log[-5:]  # 最近5条记录
         }
+
+# 创建全局状态管理器（向后兼容）
+action_state = ActionStateManager()
+
+def ensure_auth_file_exists(auth_file_path: Path) -> bool:
+    """
+    确保认证文件存在且格式正确
+    
+    Args:
+        auth_file_path: 认证文件路径
+    
+    Returns:
+        bool: 文件是否存在且有效
+    """
+    try:
+        if not auth_file_path.exists():
+            logger.info(f"认证文件不存在: {auth_file_path}")
+            return False
+        
+        # 检查文件大小
+        file_size = auth_file_path.stat().st_size
+        if file_size == 0:
+            logger.warning(f"认证文件为空: {auth_file_path}")
+            return False
+        
+        # 尝试解析JSON
+        with open(auth_file_path, 'r', encoding='utf-8') as f:
+            auth_data = json.load(f)
+        
+        # 检查基本结构
+        if not isinstance(auth_data, dict):
+            logger.warning(f"认证文件格式错误，不是字典类型: {type(auth_data)}")
+            return False
+        
+        # 检查cookies字段
+        cookies = auth_data.get('cookies', [])
+        if not isinstance(cookies, list):
+            logger.warning(f"cookies字段格式错误: {type(cookies)}")
+            return False
+        
+        logger.info(f"认证文件验证通过: {auth_file_path} (包含 {len(cookies)} 个cookies)")
+        return True
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"认证文件JSON格式错误: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"验证认证文件时出错: {e}")
+        return False
 
 def create_precision_controller() -> Controller:
     """创建精确控制器，包含自定义action"""
@@ -141,6 +201,18 @@ def create_precision_controller() -> Controller:
             await page.get_by_role("textbox", name="密码").fill(xhs_ad_password)
             await page.locator(".d-checkbox-indicator").first.click()
             await page.get_by_role("button", name="登 录").click()
+            
+            # 等待登录完成
+            await asyncio.sleep(3)
+            
+            # 手动保存cookies状态
+            try:
+                auth_file = Path.cwd().absolute() / 'xiaohongshu_auth.json'
+                logger.info(f"💾 保存认证状态到: {auth_file}")
+                await browser_session.save_storage_state(str(auth_file))
+                logger.info("✅ 认证状态保存成功")
+            except Exception as save_error:
+                logger.warning(f"⚠️ 保存认证状态失败: {save_error}")
             
             logger.info("✅ 成功完成登录操作")
             return ActionResult(extracted_content="Successfully navigated and logged in to XiaoHongShu Ad Platform")
@@ -189,6 +261,14 @@ def create_precision_controller() -> Controller:
             
             logger.info(f"✅ 成功获取到 {len(titles)} 个标题")
             
+            # ⭐ 关键改进：将结果保存到状态管理器
+            state_manager = ActionStateManager()
+            current_page = state_manager.get_data('current_page', 1)
+            state_manager.set_data("all_titles", titles, f"第{current_page}页的所有笔记标题")
+            state_manager.set_data("titles_count", len(titles), "当前页标题数量")
+            
+            logger.info(f"🔍 DEBUG: 状态管理器已保存 {len(titles)} 个标题到第{current_page}页")
+            
             return ActionResult(extracted_content=json.dumps(titles, ensure_ascii=False))
         except Exception as e:
             logger.error(f"❌ 获取核心笔记的title列表失败: {str(e)}")
@@ -204,6 +284,19 @@ def create_precision_controller() -> Controller:
             page = await browser_session.get_current_page()
             logger.info(f"🔍 DEBUG: 点击下一页前，当前URL: {page.url}")
             
+            # 更新页码状态
+            state_manager = ActionStateManager()
+            current_page = state_manager.get_data("current_page", 1)
+            max_pages = state_manager.get_data("max_pages", 3)  # 获取最大页数限制
+            next_page = current_page + 1
+            
+            # ⭐ 关键修复：检查页面数量限制
+            if current_page >= max_pages:
+                logger.info(f"🛑 已达到最大页数限制: {current_page}/{max_pages}")
+                return ActionResult(extracted_content=f"Reached maximum pages limit: {current_page}/{max_pages}")
+            
+            logger.info(f"🔍 DEBUG: 准备从第{current_page}页跳转到第{next_page}页 (最大页数: {max_pages})")
+            
             # 使用原有XPath作为备用
             try:
                 logger.info("🔍 尝试策略1b: 使用原有XPath定位")
@@ -211,6 +304,11 @@ def create_precision_controller() -> Controller:
                 if await xpath_button.count() > 0:
                     await xpath_button.click()
                     logger.info("✅ 策略1成功: XPath点击成功")
+                    
+                    # 更新页码状态
+                    state_manager.set_data("current_page", next_page, f"已跳转到第{next_page}页")
+                    logger.info(f"🔍 DEBUG: 页码状态已更新为第{next_page}页")
+                    
                     return ActionResult(extracted_content="Successfully clicked next page using XPath")
             except Exception as e:
                 logger.warning(f"⚠️ 策略1b失败: {e}")
@@ -228,13 +326,39 @@ def create_precision_controller() -> Controller:
         """提取相关标题 - 基于语义和行业相关性而非字面量匹配"""
         logger.info(f"🎯 开始提取相关标题")
         
+        # ⭐ 单例模式：直接获取状态管理器实例
+        state_manager = ActionStateManager()
+        logger.info(f"🐛 DEBUG: extract_related_titles中获取状态管理器")
+        logger.info(f"🐛 DEBUG: extract_related_titles中ActionStateManager实例ID: {id(state_manager)}")
+        logger.info(f"🐛 DEBUG: extract_related_titles中当前完整状态: {dict(state_manager.state)}")
+        
+        # 从状态管理器获取标题列表
+        title_list = state_manager.get_data("all_titles", [])
+        logger.info(f"🔍 DEBUG: 从状态管理器获取标题列表，类型: {type(title_list)}, 长度: {len(title_list) if title_list else 'None'}")
+        
+        if not title_list:
+            logger.warning("⚠️ 未找到标题列表，可能需要先执行 get_core_note_titles")
+            return ActionResult(extracted_content='{"related_titles": [], "error": "未找到标题数据"}')
+        
+        promotion_target = state_manager.get_data("promotion_target", "")
+        logger.info(f"🔍 DEBUG: 从状态管理器获取推广标的: '{promotion_target}' (类型: {type(promotion_target)})")
+        logger.info(f"🐛 DEBUG: 推广标的获取后的完整状态检查: {dict(state_manager.state)}")
+        
+        if not promotion_target:
+            logger.warning("⚠️ 未找到推广标的，可能需要先执行 set_promotion_target")
+            return ActionResult(extracted_content='{"related_titles": [], "error": "未找到推广标的"}')
+        
+        logger.info(f"🎯 提取相关标题, 推广标的: {promotion_target}, 标题列表长度: {len(title_list)}")
+        logger.info(f"🔍 DEBUG: 标题列表内容: {title_list[:5] if len(title_list) > 5 else title_list}")  # 只显示前5个
+      
         try:
             extraction_llm = ChatOpenAI(
                 base_url='https://openrouter.ai/api/v1',
-                model='deepseek/deepseek-chat:free',
+                model='qwen/qwen3-235b-a22b-07-25:free',
                 api_key=os.environ['OPENROUTER_API_KEY'],
                 temperature=0.1
             )
+
             logger.info("✅ DEBUG: LLM实例创建成功")
         except Exception as llm_error:
             logger.error(f"❌ DEBUG: LLM实例创建失败: {llm_error}")
@@ -261,8 +385,62 @@ def create_precision_controller() -> Controller:
 
 如果没有找到相关标题，返回空数组：[]'''
 
-        # 这里需要从外部获取数据，暂时返回空结果
-        return ActionResult(extracted_content='{"related_titles": [], "error": "需要外部提供标题列表"}')
+        template = PromptTemplate(input_variables=['title_list', 'promotion_target'], template=prompt)
+
+        try:
+                logger.info("🔍 DEBUG: 开始调用LLM进行标题提取...")
+                output = await extraction_llm.ainvoke(template.format(title_list=title_list, promotion_target=promotion_target))
+                logger.info(f"🔍 DEBUG: LLM调用成功，输出类型: {type(output)}")
+                
+                # 尝试解析为JSON
+                import json
+                try:
+                    # 提取JSON内容
+                    response_content = output.content.strip()
+                    logger.info(f"🔍 DEBUG: LLM原始响应内容: {response_content[:200]}...")  # 只显示前200字符
+                    
+                    # 如果包含代码块，提取JSON部分
+                    if '```' in response_content:
+                        start_idx = response_content.find('[')
+                        end_idx = response_content.rfind(']') + 1
+                        if start_idx != -1 and end_idx != 0:
+                            response_content = response_content[start_idx:end_idx]
+                            logger.info(f"🔍 DEBUG: 提取JSON部分: {response_content}")
+                    
+                    related_titles = json.loads(response_content)
+                    logger.info(f"🔍 DEBUG: JSON解析成功，相关标题类型: {type(related_titles)}, 长度: {len(related_titles)}")
+                    
+                    logger.info(f"✅ 成功提取到 {len(related_titles)} 个相关标题")
+                    logger.info(f"📋 相关标题: {related_titles}")
+                    
+                    # ⭐ 关键改进：将相关标题保存到状态管理器
+                    state_manager.set_data("related_titles", related_titles, f"与{promotion_target}相关的标题")
+                    state_manager.set_data("related_count", len(related_titles), "相关标题数量")
+                    state_manager.set_data("processed_note_index", 0, "当前处理的笔记索引")
+                    
+                    logger.info(f"🔍 DEBUG: 状态管理器已保存相关标题数据")
+                    
+                    # 返回JSON格式的结果
+                    result = {
+                        "related_titles": related_titles,
+                        "total_count": len(related_titles),
+                        "original_count": len(title_list)
+                    }
+                    
+                    return ActionResult(extracted_content=json.dumps(result, ensure_ascii=False), include_in_memory=True)
+                    
+                except json.JSONDecodeError as je:
+                    logger.warning(f"⚠️ DEBUG: JSON解析失败: {je}")
+                    logger.warning(f"⚠️ DEBUG: 原始内容: {response_content}")
+                    # 如果JSON解析失败，尝试手动提取
+                    response_content = output.content.strip()
+                    return ActionResult(extracted_content=response_content, include_in_memory=True)
+                    
+        except Exception as e:
+            logger.error(f'❌ 提取相关标题时出错: {e}')
+            import traceback
+            logger.error(f"❌ DEBUG: 详细错误堆栈: {traceback.format_exc()}")
+            return ActionResult(extracted_content='{"related_titles": [], "error": "提取失败"}', include_in_memory=False)
 
     @controller.action('process_all_related_notes', domains=['ad.xiaohongshu.com'])
     async def process_all_related_notes(browser_session: BrowserSession) -> ActionResult:
@@ -270,33 +448,242 @@ def create_precision_controller() -> Controller:
         logger.info("🔄 开始循环处理所有相关标题的笔记详情")
         
         try:
+            # 从状态管理器获取相关标题列表
+            state_manager = ActionStateManager()
+            related_titles = state_manager.get_data("related_titles", [])
+            logger.info(f"🔍 DEBUG: 获取相关标题列表，类型: {type(related_titles)}, 内容: {related_titles}")
+            
+            if not related_titles:
+                logger.warning("⚠️ 未找到相关标题列表")
+                return ActionResult(extracted_content='{"success": false, "error": "未找到相关标题列表，请先执行extract_related_titles"}')
+            
+            # 确保related_titles是列表类型
+            if not isinstance(related_titles, list):
+                logger.error(f"❌ DEBUG: related_titles不是列表类型: {type(related_titles)}")
+                return ActionResult(extracted_content='{"success": false, "error": "相关标题数据格式错误"}')
+            
+            logger.info(f"📋 开始处理 {len(related_titles)} 个相关标题")
+            
             page = await browser_session.get_current_page()
+            processed_count = 0
+            failed_count = 0
             processing_results = []
             
-            # 这里需要从外部获取相关标题列表，暂时返回空结果
+            for i, note_title in enumerate(related_titles):
+                try:
+                    logger.info(f"🔄 处理第 {i+1}/{len(related_titles)} 个标题: {note_title}")
+                    logger.info(f"🔍 DEBUG: 当前标题类型: {type(note_title)}, 内容: {note_title}")
+                    
+                    # 确保note_title是字符串
+                    if not isinstance(note_title, str):
+                        logger.error(f"❌ DEBUG: 标题不是字符串类型: {type(note_title)}")
+                        processing_results.append({
+                            "title": str(note_title),
+                            "status": "failed",
+                            "error": "标题类型错误"
+                        })
+                        continue
+                    
+                    # 检查是否已经解析过该笔记
+                    is_parsed = state_manager.get_note_detail_parsed(note_title, False)
+                    if is_parsed:
+                        logger.info(f"⏭️ 跳过已解析的笔记: {note_title}")
+                        processing_results.append({
+                            "title": note_title,
+                            "status": "skipped",
+                            "reason": "already_parsed"
+                        })
+                        continue
+                    
+                    # 步骤a: 打开笔记详情页
+                    logger.info(f"📖 打开笔记详情页: {note_title}")
+                    await page.get_by_role("heading", name="核心笔记").click()
+                    await asyncio.sleep(0.5)  # 等待页面稳定
+                    
+                    # 尝试点击标题
+                    title_locator = page.locator("#content-core-notes").get_by_text(note_title)
+                    await title_locator.click()
+                    await asyncio.sleep(2)  # 等待弹窗加载
+                    
+                    # 步骤b: 提取笔记数据
+                    logger.info(f"📊 提取笔记数据: {note_title}")
+                    
+                    # 检查弹窗是否成功打开
+                    modal_title = await page.locator(".interaction-title").text_content()
+                    if not modal_title or modal_title.strip() != note_title:
+                        logger.warning(f"⚠️ 弹窗标题不匹配: 期望'{note_title}', 实际'{modal_title}'")
+                    
+                    # 复制笔记链接
+                    await page.get_by_text("复制小红书笔记链接").click()
+                    await asyncio.sleep(0.5)
+                    note_url = pyperclip.paste()
+                    logger.info(f"📎 获取笔记链接: {note_url}")
+                    
+                    # 提取数据统计
+                    items = await page.locator('.interaction-card-item').all()
+                    stats = {}
+                    
+                    for item in items:
+                        label_text = await item.locator('.interaction-card-item-label text').text_content()
+                        value_text = await item.locator('.interaction-card-item-value').text_content()
+                        
+                        # 格式化数据 - 使用与extract_note_data_from_modal相同的逻辑
+                        if value_text:
+                            value_text = value_text.strip()
+                            try:
+                                if "万" in value_text:
+                                    # 处理 "36.3万" 或 "3万" 格式
+                                    numeric_part = value_text.replace("万", "").strip()
+                                    if numeric_part:
+                                        value = int(float(numeric_part) * 10000)
+                                    else:
+                                        value = 0
+                                elif "千" in value_text:
+                                    # 处理 "3.5千" 格式
+                                    numeric_part = value_text.replace("千", "").strip()
+                                    if numeric_part:
+                                        value = int(float(numeric_part) * 1000)
+                                    else:
+                                        value = 0
+                                elif value_text.replace(".", "").replace(",", "").isdigit():
+                                    # 处理纯数字格式 "1000" 或 "1,000"
+                                    clean_text = value_text.replace(",", "")
+                                    if "." in clean_text:
+                                        value = int(float(clean_text))
+                                    else:
+                                        value = int(clean_text)
+                                else:
+                                    # 其他格式设为0
+                                    value = 0
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"⚠️ 数据格式转换失败: '{value_text}' -> {e}")
+                                value = 0
+                        else:
+                            value = 0
+                        
+                        label = label_text.strip() if label_text else ''
+                        match label:
+                            case "总曝光量":
+                                stats["impression"] = value
+                            case "总阅读量":
+                                stats["click"] = value
+                            case "总点赞量":
+                                stats["like"] = value
+                            case "总收藏量":
+                                stats["collect"] = value
+                            case "总评论量":
+                                stats["comment"] = value
+                            case "总互动量":
+                                stats["engage"] = value
+                        
+                        logger.info(f"📊 数据解析: {label} = '{value_text}' -> {value}")
+                    
+                    # 构造笔记数据
+                    note_data = {
+                        "note_title": note_title,
+                        "note_url": note_url or f"https://xiaohongshu.com/note/unknown_{i}",
+                        "impression": stats.get("impression", 0),
+                        "click": stats.get("click", 0),
+                        "like": stats.get("like", 0),
+                        "collect": stats.get("collect", 0),
+                        "comment": stats.get("comment", 0),
+                        "engage": stats.get("engage", 0)
+                    }
+                    
+                    # 保存到状态管理器
+                    collected_notes = state_manager.get_data("collected_notes", [])
+                    collected_notes.append(note_data)
+                    state_manager.set_data("collected_notes", collected_notes, f"已采集{len(collected_notes)}条笔记数据")
+                    state_manager.set_note_detail_parsed(note_title, True)
+                    
+                    # 步骤c: 关闭笔记详情页
+                    logger.info(f"❌ 关闭笔记详情页: {note_title}")
+                    close_button = page.locator("div").filter(has_text=re.compile(r"^笔记详情$")).get_by_role("img")
+                    await close_button.click()
+                    await asyncio.sleep(1)  # 等待弹窗关闭
+                    
+                    processed_count += 1
+                    processing_results.append({
+                        "title": note_title,
+                        "status": "success",
+                        "data": note_data
+                    })
+                    
+                    logger.info(f"✅ 成功处理: {note_title} ({i+1}/{len(related_titles)})")
+                    
+                except Exception as e:
+                    failed_count += 1
+                    error_msg = str(e)
+                    logger.error(f"❌ 处理失败: {note_title} - {error_msg}")
+                    
+                    # 尝试关闭打开的弹窗
+                    try:
+                        close_button = page.locator("div").filter(has_text=re.compile(r"^笔记详情$")).get_by_role("img")
+                        if await close_button.is_visible():
+                            await close_button.click()
+                            await asyncio.sleep(0.5)
+                    except:
+                        pass
+                    
+                    processing_results.append({
+                        "title": note_title,
+                        "status": "failed",
+                        "error": error_msg
+                    })
+                    
+                    # 如果连续失败太多，提前结束
+                    if failed_count >= 3:
+                        logger.warning("⚠️ 连续失败过多，提前结束处理")
+                        break
+            
+            # 汇总结果
+            total_collected = len(state_manager.get_data("collected_notes", []))
             result = {
                 "success": True,
                 "summary": {
-                    "total_related_titles": 0,
-                    "processed_count": 0,
-                    "failed_count": 0,
-                    "skipped_count": 0,
-                    "total_collected_notes": 0
+                    "total_related_titles": len(related_titles),
+                    "processed_count": processed_count,
+                    "failed_count": failed_count,
+                    "skipped_count": len([r for r in processing_results if r["status"] == "skipped"]),
+                    "total_collected_notes": total_collected
                 },
                 "processing_results": processing_results,
-                "message": "循环处理完成: 需要外部提供相关标题列表"
+                "message": f"循环处理完成: 成功{processed_count}个, 失败{failed_count}个, 总采集{total_collected}条笔记"
             }
             
+            logger.info(f"🎉 循环处理完成: {result['summary']}")
             return ActionResult(extracted_content=json.dumps(result, ensure_ascii=False))
             
         except Exception as e:
             logger.error(f"❌ 循环处理过程中出错: {str(e)}")
             return ActionResult(extracted_content=f"循环处理失败: {str(e)}")
 
+    @controller.action('get_collection_status')
+    async def get_collection_status() -> ActionResult:
+        """获取当前采集进度和状态"""
+        logger.info("🎯 获取当前采集进度")
+        
+        state_manager = ActionStateManager()
+        status = {
+            "execution_summary": state_manager.get_execution_summary(),
+            "data_summary": {
+                "all_titles_count": len(state_manager.get_data("all_titles", [])),
+                "related_titles_count": state_manager.get_data("related_count", 0),
+                "processed_index": state_manager.get_data("processed_note_index", 0),
+                "collected_notes_count": len(state_manager.get_data("collected_notes", [])),
+                "current_page": state_manager.get_data("current_page", 1),
+                "parsed_notes_count": len(state_manager.note_detail_parsed)
+            },
+            "current_state": dict(state_manager.state)
+        }
+        
+        logger.info(f"📊 当前进度: {status['data_summary']}")
+        return ActionResult(extracted_content=json.dumps(status, ensure_ascii=False))
+
     logger.info(f"✅ 控制器创建完成")
     return controller
 
-def create_hot_note_finder_agent(promotion_target: str = '国企央企求职辅导小程序') -> Agent:
+def create_hot_note_finder_agent(promotion_target: str = '国企央企求职辅导小程序', max_pages: int = 3) -> Agent:
     """创建使用Controller Action的代理"""
     
     # 配置LLM
@@ -314,18 +701,27 @@ def create_hot_note_finder_agent(promotion_target: str = '国企央企求职辅�
         temperature=0.1
     )
 
-    # 检查认证状态文件
-    auth_file = Path('./xiaohongshu_auth.json')
+    # 使用绝对路径配置认证文件
+    auth_file = Path.cwd().absolute() / 'xiaohongshu_auth.json'
+    browser_data_dir = Path.cwd().absolute() / 'browser_data' / 'xiaohongshu'
     
-    # 创建浏览器会话
+    # 确保浏览器数据目录存在
+    browser_data_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 验证认证文件
+    auth_file_valid = ensure_auth_file_exists(auth_file)
+    logger.info(f"🔍 认证文件状态: {auth_file} -> {'有效' if auth_file_valid else '无效或不存在'}")
+    
+    # 创建浏览器会话，使用绝对路径
     browser_profile = BrowserProfile(
         executable_path=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
-        user_data_dir=None,
+        user_data_dir=str(browser_data_dir),  # 使用持久化数据目录
     )
 
     browser_session = BrowserSession(
         allowed_domains=['https://*.xiaohongshu.com'],
-        storage_state='./xiaohongshu_auth.json' if auth_file.exists() else None,
+        storage_state=str(auth_file) if auth_file_valid else None,  # 使用绝对路径
+        save_storage_state=str(auth_file),  # 设置保存路径
         browser_profile=browser_profile,
         headless=False,
     )
@@ -340,8 +736,8 @@ def create_hot_note_finder_agent(promotion_target: str = '国企央企求职辅�
     
     # 创建精确控制器
     controller = create_precision_controller()
+  # 使用Controller Action的任务描述，集成精确选择器
 
-    # 使用Controller Action的任务描述，集成精确选择器
     task = f"""
 你是一个专业的小红书数据采集助手，具备精确的元素定位能力。你的任务是采集与"{promotion_target}"相关的优质热门笔记数据。
 
@@ -366,13 +762,17 @@ def create_hot_note_finder_agent(promotion_target: str = '国企央企求职辅�
 3. 获取当前页面核心笔记的所有标题，使用 get_core_note_titles tool
 4. 从当前页面所有核心笔记的标题中提取有相关性的标题，使用 extract_related_titles tool
 5. 使用 process_all_related_notes tool 批量处理所有相关标题的笔记详情，每个笔记执行：打开详情页 -> 提取数据 -> 关闭详情页的操作
-6. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理10页
-7. 最终输出采集结果
+6. 使用 get_collection_status tool 查看当前采集进度和状态
+7. 点击下一页，使用 click_next_page tool，重复步骤3-6，最多处理{max_pages}页
+8. **重要**：如果 click_next_page 返回 "Reached maximum pages limit"，立即停止处理并使用 get_collection_status 获取最终结果
+9. 最终使用 get_collection_status tool 获取完整的采集结果
 
 **⚠️ 重要约束：**
-- 如果某个action连续失败，请立即输出已采集的数据并结束
+- 严格遵守 {max_pages} 页的处理限制，不得超过此数量
+- 如果 click_next_page 提示达到页面限制，必须立即停止并输出结果
+- 如果某个action连续失败，请立即使用 get_collection_status 获取已采集的数据并输出结果
 - 不要无限重试失败的操作，优先保证已采集数据的完整性
-- 如果出现技术问题，请立即输出当前已采集的数据
+- 如果出现技术问题，请立即使用 get_collection_status 输出当前已采集的数据
 
 **最终输出格式：**
 请以结构化的JSON格式输出结果:
@@ -396,6 +796,13 @@ def create_hot_note_finder_agent(promotion_target: str = '国企央企求职辅�
     # 官方调试功能
     debug_dir = Path("output/debug")
     debug_dir.mkdir(parents=True, exist_ok=True)
+    
+    # ⭐ 关键修复：确保推广标的被设置到状态管理器
+    logger.info(f"🐛 DEBUG: 在create_hot_note_finder_agent中准备设置推广标的: '{promotion_target}'")
+    logger.info(f"🐛 DEBUG: create_hot_note_finder_agent中action_state实例ID: {id(action_state)}")
+    action_state.set_data("promotion_target", promotion_target, f"推广标的: {promotion_target}")
+    logger.info(f"🎯 推广标的已设置到状态管理器: {promotion_target}")
+    logger.info(f"🐛 DEBUG: 设置后的完整状态: {dict(action_state.state)}")
     
     # 创建代理
     agent = Agent(
@@ -543,7 +950,7 @@ async def save_results_for_crewai_flows(note_data_list: List[NoteData], output_d
         logger.error(f"❌ 保存文件时出错: {e}")
         return {"error": str(e)}
 
-class HotNoteFinder(BaseTool):
+class HotNoteFinder:
     """
     小红书热门笔记查找工具 - 基于browser_use的CrewAI工具
     """
@@ -594,13 +1001,18 @@ class HotNoteFinder(BaseTool):
             action_state = ActionStateManager()
             
             # 创建代理
-            agent = create_hot_note_finder_agent(promotion_target=promotion_target)
+            agent = create_hot_note_finder_agent(promotion_target=promotion_target, max_pages=max_pages)
             logger.info("✅ 代理创建成功")
             
             # 清理之前的状态
+            logger.info(f"🐛 DEBUG: HotNoteFinder._async_run中清理前的状态: {dict(action_state.state)}")
+            logger.info(f"🐛 DEBUG: HotNoteFinder._async_run中action_state实例ID: {id(action_state)}")
             action_state.clear_data()
-            action_state.set_data("promotion_target", promotion_target)
-            action_state.set_data("max_pages", max_pages)
+            logger.info(f"🐛 DEBUG: HotNoteFinder._async_run中清理后的状态: {dict(action_state.state)}")
+            
+            action_state.set_data("promotion_target", promotion_target, f"推广标的: {promotion_target}")
+            action_state.set_data("max_pages", max_pages, f"最大页数: {max_pages}")
+            logger.info(f"🎯 工具执行: 最大页数已设置 = {max_pages}")
             
             try: 
                 # 运行任务

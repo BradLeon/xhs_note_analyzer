@@ -1,11 +1,19 @@
 #!/usr/bin/env python
 import asyncio
 import json
+import logging
 from typing import List, Dict, Any
 from pathlib import Path
 from pydantic import BaseModel
 
 from crewai.flow import Flow, listen, start
+
+# 配置调试日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # 导入现有组件
 from xhs_note_analyzer.tools.hot_note_finder_tool import find_hot_notes
@@ -109,6 +117,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
     async def step1_find_hot_notes(self):
         """第一步：查找相关优质笔记"""
         print("\n📍 === 第一步：查找相关优质笔记 ===")
+        logger.info(f"🔍 DEBUG: 开始Step1，目标：{self.state.promotion_target}")
         
         try:
             # 使用新的find_hot_notes工具函数
@@ -123,6 +132,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             )
             
             if result.success and result.data.note_data_list:
+                logger.info(f"🔍 DEBUG: find_hot_notes返回成功，笔记数：{len(result.data.note_data_list)}")
                 # 转换结果为NoteData对象
                 found_notes = []
                 for note_data in result.data.note_data_list:
@@ -174,8 +184,10 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
     def step2_fetch_note_content(self):
         """第二步：获取笔记详细内容"""
         print("\n📍 === 第二步：获取笔记详细内容 ===")
+        logger.info(f"🔍 DEBUG: 开始Step2，待处理笔记数：{len(self.state.found_notes) if self.state.found_notes else 0}")
         
         if not self.state.notes_search_completed or not self.state.found_notes:
+            logger.warning("🔍 DEBUG: Step2跳过，原因：无笔记数据")
             print("⚠️ 跳过内容获取：未找到笔记数据")
             return
         
@@ -237,8 +249,10 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
     def step3_multi_dimensional_analysis(self):
         """第三步：多维度内容分析"""
         print("\n📍 === 第三步：多维度内容分析 ===")
+        logger.info(f"🔍 DEBUG: 开始Step3，待分析笔记数：{len(self.state.detailed_notes) if self.state.detailed_notes else 0}")
         
         if not self.state.content_fetch_completed or not self.state.detailed_notes:
+            logger.warning("🔍 DEBUG: Step3跳过，原因：无详细内容")
             print("⚠️ 跳过内容分析：未获取到详细内容")
             return
         
@@ -293,8 +307,10 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
     def step4_strategy_making(self):
         """第四步：实战策略制定"""
         print("\n📍 === 第四步：实战策略制定 ===")
+        logger.info(f"🔍 DEBUG: 开始Step4，分析报告状态：{self.state.analysis_completed}")
         
         if not self.state.analysis_completed or not self.state.content_analysis_report:
+            logger.warning("🔍 DEBUG: Step4跳过，原因：内容分析未完成")
             print("⚠️ 跳过策略制定：内容分析未完成")
             return
         
