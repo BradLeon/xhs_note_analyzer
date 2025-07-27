@@ -18,9 +18,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
 
-from crewai import Agent, Crew, Task, Process
+from crewai import Agent, Crew, Task, Process, LLM
 from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
+
 
 from .models import (
     ContentAnalysisResult,
@@ -43,16 +44,15 @@ class ContentAnalyzerCrew():
     tasks_config = 'config/tasks.yaml'
 
     def __init__(self):
-        # 使用OpenRouter的Claude 3.5 Sonnet进行内容分析
+
         self.llm = ChatOpenAI(
-            #model="anthropic/claude-3.5-sonnet",
-            model="google/gemini-2.5-flash",
-            openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-            openai_api_base="https://openrouter.ai/api/v1",
-            temperature=0.1,  # 较低温度确保分析的一致性
-            max_tokens=4000
+        base_url='https://openrouter.ai/api/v1',
+        model='openrouter/google/gemini-2.5-flash-lite',
+        api_key=os.environ['OPENROUTER_API_KEY'],
+        temperature=0.1
         )
 
+        
     @agent
     def content_structure_analyst(self) -> Agent:
         """内容结构分析专家"""
@@ -95,7 +95,8 @@ class ContentAnalyzerCrew():
         """内容结构分析任务"""
         return Task(
             config=self.tasks_config['analyze_content_structure'],
-            agent=self.content_structure_analyst()
+            agent=self.content_structure_analyst(),
+            output_pydantic=ContentStructureAnalysis
         )
 
     @task
@@ -103,7 +104,8 @@ class ContentAnalyzerCrew():
         """情感价值分析任务"""
         return Task(
             config=self.tasks_config['analyze_emotional_value'],
-            agent=self.emotional_value_analyst()
+            agent=self.emotional_value_analyst(),
+            output_pydantic=EmotionalValueAnalysis
         )
 
     @task
@@ -111,7 +113,8 @@ class ContentAnalyzerCrew():
         """视觉元素分析任务"""
         return Task(
             config=self.tasks_config['analyze_visual_elements'],
-            agent=self.visual_element_analyst()
+            agent=self.visual_element_analyst(),
+            output_pydantic=VisualElementAnalysis
         )
 
 
@@ -126,6 +129,7 @@ class ContentAnalyzerCrew():
                 self.analyze_emotional_value_task(),
                 self.analyze_visual_elements_task()
             ]
+            # 协调任务不需要特定的Pydantic输出，返回Markdown报告即可
         )
 
     @crew
@@ -220,27 +224,98 @@ class ContentAnalyzerCrew():
     def _parse_analysis_result(self, crew_result, note_data) -> ContentAnalysisResult:
         """解析Crew执行结果并转换为结构化数据"""
         try:
-            # 尝试解析JSON结果
-            if isinstance(crew_result, str):
-                result_data = json.loads(crew_result)
+            logger.info(f"🔍 开始解析分析结果，类型: {type(crew_result)}")
+            
+            # 初始化各维度分析结果
+            structure_analysis = None
+            emotional_analysis = None
+            visual_analysis = None
+            
+            # 从tasks_output中获取各个任务的Pydantic结果
+            if hasattr(crew_result, 'tasks_output') and crew_result.tasks_output:
+                logger.info(f"📋 从tasks_output解析，任务数量: {len(crew_result.tasks_output)}")
+                
+                for i, task_output in enumerate(crew_result.tasks_output):
+                    try:
+                        logger.info(f"🔧 处理任务 {i+1}: {type(task_output)}")
+                        
+                        # 检查是否有pydantic输出（这是我们配置的output_pydantic）
+                        if hasattr(task_output, 'pydantic') and task_output.pydantic:
+                            pydantic_obj = task_output.pydantic
+                            logger.info(f"✅ 任务 {i+1} 有Pydantic输出: {type(pydantic_obj)}")
+                            
+                            # 根据Pydantic对象类型确定是哪个维度的分析
+                            if isinstance(pydantic_obj, ContentStructureAnalysis):
+                                structure_analysis = pydantic_obj
+                                logger.info(f"✅ 获取到内容结构分析结果")
+                            elif isinstance(pydantic_obj, EmotionalValueAnalysis):
+                                emotional_analysis = pydantic_obj
+                                logger.info(f"✅ 获取到情感价值分析结果")
+                            elif isinstance(pydantic_obj, VisualElementAnalysis):
+                                visual_analysis = pydantic_obj
+                                logger.info(f"✅ 获取到视觉元素分析结果")
+                            else:
+                                logger.warning(f"⚠️ 未知的Pydantic对象类型: {type(pydantic_obj)}")
+                        
+                        # 如果没有Pydantic输出，尝试从json_dict获取
+                        elif hasattr(task_output, 'json_dict') and task_output.json_dict:
+                            json_data = task_output.json_dict
+                            logger.info(f"📊 任务 {i+1} 有JSON输出，键: {list(json_data.keys())}")
+                            
+                            # 根据任务顺序和内容判断类型
+                            if i == 0:  # 第一个任务是内容结构分析
+                                structure_analysis = ContentStructureAnalysis(note_id=note_data.note_id, **json_data)
+                                logger.info(f"✅ 从JSON创建内容结构分析结果")
+                            elif i == 1:  # 第二个任务是情感价值分析
+                                emotional_analysis = EmotionalValueAnalysis(note_id=note_data.note_id, **json_data)
+                                logger.info(f"✅ 从JSON创建情感价值分析结果")
+                            elif i == 2:  # 第三个任务是视觉元素分析
+                                visual_analysis = VisualElementAnalysis(note_id=note_data.note_id, **json_data)
+                                logger.info(f"✅ 从JSON创建视觉元素分析结果")
+                        
+                        else:
+                            logger.warning(f"⚠️ 任务 {i+1} 没有结构化输出，跳过")
+                            
+                    except Exception as task_error:
+                        logger.warning(f"⚠️ 解析任务 {i+1} 失败: {task_error}")
+                        continue
+            
+            # 如果某些维度的分析结果为空，创建默认值
+            if not structure_analysis:
+                logger.warning("⚠️ 内容结构分析结果为空，创建默认值")
+                structure_analysis = ContentStructureAnalysis(note_id=note_data.note_id)
+            
+            if not emotional_analysis:
+                logger.warning("⚠️ 情感价值分析结果为空，创建默认值")
+                emotional_analysis = EmotionalValueAnalysis(note_id=note_data.note_id)
+            
+            if not visual_analysis:
+                logger.warning("⚠️ 视觉元素分析结果为空，创建默认值")
+                visual_analysis = VisualElementAnalysis(note_id=note_data.note_id)
+            
+            # 计算综合评分（基于各维度评分的平均值）
+            scores = []
+            if hasattr(structure_analysis, 'readability_score') and structure_analysis.readability_score > 0:
+                scores.append(structure_analysis.readability_score)
+            if hasattr(emotional_analysis, 'emotional_intensity') and emotional_analysis.emotional_intensity > 0:
+                scores.append(emotional_analysis.emotional_intensity)
+            # 视觉分析没有直接的评分字段，使用默认值
+            if len(scores) == 0:
+                overall_score = 75.0
             else:
-                result_data = crew_result
+                overall_score = sum(scores) / len(scores)
             
-            # 创建各维度分析结果
-            structure_analysis = ContentStructureAnalysis(
-                note_id=note_data.note_id,
-                **result_data.get("structure_analysis", {})
-            )
+            # 收集成功要素
+            success_factors = []
+            if structure_analysis.title_pattern:
+                success_factors.append(f"标题策略: {structure_analysis.title_pattern}")
+            if emotional_analysis.pain_points:
+                success_factors.append(f"痛点挖掘: {len(emotional_analysis.pain_points)}个痛点")
+            if visual_analysis.image_style:
+                success_factors.append(f"视觉风格: {visual_analysis.image_style}")
             
-            emotional_analysis = EmotionalValueAnalysis(
-                note_id=note_data.note_id,
-                **result_data.get("emotional_analysis", {})
-            )
-            
-            visual_analysis = VisualElementAnalysis(
-                note_id=note_data.note_id,
-                **result_data.get("visual_analysis", {})
-            )
+            if not success_factors:
+                success_factors = ["完成基础分析"]
             
             # 创建完整分析结果
             analysis_result = ContentAnalysisResult(
@@ -249,18 +324,22 @@ class ContentAnalyzerCrew():
                 structure_analysis=structure_analysis,
                 emotional_analysis=emotional_analysis,
                 visual_analysis=visual_analysis,
-                overall_score=result_data.get("overall_score", 75.0),
-                success_factors=result_data.get("success_factors", []),
-                improvement_suggestions=result_data.get("improvement_suggestions", []),
-                replicability_score=result_data.get("replicability_score", 70.0),
+                overall_score=overall_score,
+                success_factors=success_factors,
+                improvement_suggestions=["基于多维度分析的优化建议"],
+                replicability_score=overall_score * 0.9,  # 可复制性略低于整体评分
                 analysis_timestamp=datetime.now().isoformat(),
                 analysis_version="1.0"
             )
             
+            logger.info(f"✅ 成功解析分析结果，综合评分: {overall_score:.1f}")
             return analysis_result
             
         except Exception as e:
-            logger.warning(f"⚠️ 解析分析结果失败，使用fallback: {e}")
+            logger.error(f"❌ 解析分析结果失败: {e}")
+            logger.error(f"❌ 错误详情: {str(e)}")
+            import traceback
+            logger.error(f"❌ 堆栈跟踪: {traceback.format_exc()}")
             return self._create_fallback_analysis(note_data)
 
     def _create_fallback_analysis(self, note_data: NoteContentData) -> ContentAnalysisResult:

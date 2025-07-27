@@ -32,8 +32,8 @@ class ContentStructureAnalysis(BaseModel):
     
     # 整体结构
     word_count: int = Field(default=0, description="字数统计")
-    readability_score: str = Field(default="", description="可读性评分")
-    structure_completeness: str = Field(default="", description="结构完整性")
+    readability_score: float = Field(default=0.0, description="可读性评分(0-100)")
+    structure_completeness: float = Field(default=0.0, description="结构完整性评分(0-100)")
 
 
 class EmotionalValueAnalysis(BaseModel):
@@ -50,7 +50,7 @@ class EmotionalValueAnalysis(BaseModel):
     
     # 情感触发
     emotional_triggers: List[str] = Field(default_factory=list, description="情感触发器")
-    emotional_intensity: str = Field(default="", description="情感强度")
+    emotional_intensity: float = Field(default=0.0, description="情感强度评分(0-100)")
     
     # 可信度建设
     credibility_signals: List[str] = Field(default_factory=list, description="可信度信号")
