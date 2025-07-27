@@ -30,13 +30,8 @@ from .models import (
     ContentAnalysisReport
 )
 
-# Import NoteContentData from main module
-try:
-    from xhs_note_analyzer.main import NoteContentData
-except ImportError:
-    # 如果导入失败，创建一个临时的类型定义
-    from typing import Any
-    NoteContentData = Any
+# 导入公共数据模型
+from xhs_note_analyzer.models import NoteContentData
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +45,8 @@ class ContentAnalyzerCrew():
     def __init__(self):
         # 使用OpenRouter的Claude 3.5 Sonnet进行内容分析
         self.llm = ChatOpenAI(
-            model="anthropic/claude-3.5-sonnet",
+            #model="anthropic/claude-3.5-sonnet",
+            model="google/gemini-2.5-flash",
             openai_api_key=os.getenv("OPENROUTER_API_KEY"),
             openai_api_base="https://openrouter.ai/api/v1",
             temperature=0.1,  # 较低温度确保分析的一致性
@@ -174,9 +170,9 @@ class ContentAnalyzerCrew():
                 "image_count": len(note_data.images),
                 "note_tags": note_data.tags,
                 "author_info": note_data.author_info,
-                "like_count": note_data.basic_info.like,
-                "collect_count": note_data.basic_info.collect,
-                "comment_count": note_data.basic_info.comment
+                "like_count": getattr(note_data.basic_info, 'like', 0),
+                "collect_count": getattr(note_data.basic_info, 'collect', 0),
+                "comment_count": getattr(note_data.basic_info, 'comment', 0)
             }
             
             # 执行分析
