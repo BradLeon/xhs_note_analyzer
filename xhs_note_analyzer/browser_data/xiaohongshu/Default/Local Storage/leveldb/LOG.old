@@ -1,6 +1,0 @@
-2025/07/23-11:39:26.150 4e8e561 Reusing MANIFEST /Users/liuchao/AI/xhs_note_analyzer/xhs_note_analyzer/browser_data/xiaohongshu/Default/Local Storage/leveldb/MANIFEST-000001
-2025/07/23-11:39:26.152 4e8e561 Recovering log #4
-2025/07/23-11:39:26.152 4e8e561 Reusing old log /Users/liuchao/AI/xhs_note_analyzer/xhs_note_analyzer/browser_data/xiaohongshu/Default/Local Storage/leveldb/000004.log 
-2025/07/23-11:44:32.184 4e8e563 Level-0 table #7: started
-2025/07/23-11:44:32.186 4e8e563 Level-0 table #7: 37094 bytes OK
-2025/07/23-11:44:32.188 4e8e563 Delete type=0 #4

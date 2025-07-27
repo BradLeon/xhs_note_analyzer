@@ -4,3 +4,9 @@ lib/
 .DS_Store
 output/
 *.log
+
+# Browser automation data (contains sensitive cookies/session data)
+browser_data/
+
+# Test files and outputs (should not be committed)
+tests/
