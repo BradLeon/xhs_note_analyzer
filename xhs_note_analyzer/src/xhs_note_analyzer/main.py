@@ -24,9 +24,12 @@ from xhs_note_analyzer.models import (
 
 # 导入现有组件
 from xhs_note_analyzer.tools.hot_note_finder_tool import find_hot_notes
-from xhs_note_analyzer.crews.content_analyzer_crew import create_content_analyzer, ContentAnalysisReport
+from xhs_note_analyzer.crews.content_analyzer_crew import create_content_analyzer
 from xhs_note_analyzer.crews.strategy_maker_crew import create_strategy_maker, StrategyReport
 from xhs_note_analyzer.tools.mediacrawler_client import MediaCrawlerClient
+
+# 从公共模型导入
+from xhs_note_analyzer.models import ContentAnalysisReport
 
 
 class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):

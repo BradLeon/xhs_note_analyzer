@@ -1,57 +1,4 @@
-develop_topic_strategy:
-  description: >
-    基于内容分析结果和业务目标，制定精准的选题策略：
-    
-    1. **热门选题挖掘**：
-       - 分析成功案例中的热门选题模式和规律
-       - 识别与目标产品/服务相关的趋势性话题
-       - 挖掘具有长期价值的常青选题方向
-    
-    2. **关键词策略分析**：
-       - 构建核心关键词集群和语义网络
-       - 分析关键词竞争度和搜索热度
-       - 制定关键词布局和SEO优化策略
-    
-    3. **竞争环境分析**：
-       - 研究同类产品/服务的选题策略
-       - 识别市场空白和差异化机会
-       - 分析竞争对手的内容表现和用户反馈
-    
-    4. **选题公式制定**：
-       - 提炼可复制的选题模板和公式
-       - 设计不同类型内容的选题框架
-       - 建立选题评估和筛选机制
-    
-    **输入数据**：
-    - 业务背景: {business_context}
-    - 目标产品: {target_product}
-    - 分析报告: {analysis_report}
-    - 成功案例: {success_cases}
-    
-    **输出要求**：
-    - 提供具体可执行的选题策略
-    - 包含至少20个具体选题建议
-    - 给出选题优先级和时间规划
-    - 制定选题效果评估机制
-
-  expected_output: >
-    返回一个详细的选题策略JSON对象，包含：
-    - business_domain: 业务领域定位
-    - target_product: 目标产品描述
-    - trending_topics: 热门选题列表(至少15个)
-    - evergreen_topics: 常青选题列表(至少10个)
-    - seasonal_topics: 季节性选题分类
-    - topic_formulas: 选题公式模板(至少5个)
-    - keyword_clusters: 关键词集群字典
-    - competition_analysis: 竞争分析结果
-    - pain_point_topics: 痛点类选题(至少8个)
-    - solution_topics: 解决方案类选题(至少8个)
-    - inspiration_topics: 灵感启发类选题(至少6个)
-    - tutorial_topics: 教程干货类选题(至少8个)
-
-  agent: topic_strategy_expert
-
-analyze_target_audience:
+analyze_target_audience: --todo: 感觉应该放在选题之前，作为context传递给选题助手
   description: >
     深度分析目标用户画像，制定精准的TA策略：
     
@@ -65,12 +12,7 @@ analyze_target_audience:
        - 分析用户决策过程和影响因素
        - 识别用户行为驱动机制
     
-    3. **触达策略设计**：
-       - 制定用户触达和沟通策略
-       - 设计用户旅程和互动节点
-       - 规划用户转化漏斗和关键路径
-    
-    4. **内容偏好分析**：
+    3. **内容偏好分析**：
        - 分析目标用户的内容消费习惯
        - 识别用户互动和分享行为模式
        - 制定内容适配和个性化策略
@@ -78,8 +20,10 @@ analyze_target_audience:
     **输入数据**：
     - 业务背景: {business_context}
     - 目标产品: {target_product}
-    - 用户数据: {user_insights}
-    - 行为分析: {behavior_analysis}
+    - 内容分析报告: {analysis_report}
+    - 成功案例数据: {success_cases}
+    - 用户洞察数据: {user_insights}
+    - 行为模式数据: {behavior_analysis}
     
     **输出要求**：
     - 提供详细的用户画像和特征分析
@@ -103,35 +47,100 @@ analyze_target_audience:
 
   agent: target_audience_analyst
 
-create_content_creation_guide:
+develop_topic_strategy:
   description: >
-    制定全方位的内容创作指导，包括文案、配图、视频三个维度：
+    基于目标用户分析结果，制定精准的选题策略。请严格参考前一步的目标用户分析结果，
+    确保选题与用户需求、痛点和动机高度匹配：
     
-    1. **文案创作指南**：
-       - 制定标题创作模板和关键词策略
-       - 设计开头钩子和正文结构框架
-       - 提供CTA设计和互动引导技巧
+    1. **业务领域聚焦**：
+       - 明确定义业务领域和核心价值主张
+       - 分析目标产品的差异化优势
+       - 确定内容营销的核心目标
     
-    2. **配图设计指南**：
-       - 分析成功案例的视觉风格和色彩方案
-       - 提供构图规则和拍摄技巧指导
-       - 制定品牌一致性和视觉识别规范
+    2. **选题公式制定**：
+       - 基于用户画像制定选题公式
+       - 结合竞争分析识别差异化机会
+       - 建立选题评估和筛选标准
     
-    3. **视频脚本指南**：
-       - 设计视频脚本模板和场景规划
-       - 提供镜头语言和剪辑节奏建议
-       - 制定视频制作标准和质量要求
+    3. **精选选题推荐**：
+       - 综合考虑用户需求、业务目标、竞争环境
+       - 筛选出3-5个最有潜力的选题方向
+       - 每个选题给出详细的评估理由和执行建议
     
-    4. **创作流程标准化**：
-       - 建立内容创作的标准化工作流程
-       - 设计质量检查清单和评估体系
-       - 制定内容优化和迭代机制
+    4. **竞争策略分析**：
+       - 分析同类产品的选题策略
+       - 识别市场空白和机会点
+       - 制定差异化内容策略
     
     **输入数据**：
-    - 分析报告: {content_analysis}
-    - 成功要素: {success_factors}
-    - 视觉分析: {visual_insights}
-    - 创作需求: {creation_requirements}
+    - 目标用户分析结果: {target_audience_strategy}
+    - 业务背景: {business_context}
+    - 目标产品: {target_product}
+    - 内容分析报告: {analysis_report}
+    - 成功案例数据: {success_cases}
+    - 内容创作模式: {content_analysis}
+    
+    **输出要求**：
+    - 重点推荐3-5个高质量选题
+    - 每个选题包含评估理由和执行建议
+    - 提供可复制的选题公式
+    - 制定优先级和时间规划
+
+  expected_output: >
+    返回一个聚焦的选题策略JSON对象，包含：
+    - business_domain: 业务领域定位
+    - target_product: 目标产品描述
+    - recommended_topics: 精选推荐选题列表(3-5个)，每个包含：
+      - title: 选题标题
+      - rationale: 选择理由
+      - target_audience: 目标用户群
+      - expected_engagement: 预期互动效果
+      - execution_difficulty: 执行难度评估
+      - priority_score: 优先级评分(1-10)
+    - topic_formulas: 选题公式模板(3-5个)
+    - keyword_clusters: 核心关键词集群
+    - competition_analysis: 竞争分析要点
+
+  agent: topic_strategy_expert
+
+
+create_content_creation_guide:
+  description: >
+    基于目标用户分析和选题策略，为每个推荐选题制定具体可执行的内容创作指导。
+    请严格参考前面两步的分析结果，确保内容创作与用户需求和选题策略高度匹配：
+    
+    1. **基于选题的内容规划**：
+       - 针对每个推荐选题制定详细的内容创作方案
+       - 设计符合用户画像的内容调性和表达方式
+       - 制定内容层次结构和逻辑框架
+    
+    2. **图文笔记创作指导**：
+       - 为每个选题设计具体的标题模板和文案结构
+       - 提供开头钩子、正文框架、结尾CTA的具体示例
+       - 设计首图和配图的视觉风格和文案要求
+    
+    3. **短视频脚本创作**：
+       - 为每个选题制定详细的视频脚本模板
+       - 设计镜头语言、场景安排、台词示例
+       - 提供视频剪辑节奏和特效建议
+    
+    4. **视觉元素设计**：
+       - 制定统一的视觉风格和色彩方案
+       - 设计首图模板和配图规范
+       - 提供拍摄角度、构图原则、后期处理建议
+    
+    **输入数据**：
+    - 目标用户分析结果: {target_audience_strategy}
+    - 选题策略结果: {topic_strategy}
+    - 内容分析报告: {analysis_report}
+    - 业务背景: {business_context}
+    - 成功案例数据: {success_cases}
+    - 视觉设计模式: {visual_insights}
+    
+    **输出要求**：
+    - 针对每个推荐选题提供完整的创作指导
+    - 内容要具体可操作，避免空泛的建议
+    - 保持逻辑关联性和层次结构
     
     **输出要求**：
     - 提供可操作的创作指导和模板
@@ -140,25 +149,99 @@ create_content_creation_guide:
     - 设计质量评估和优化机制
 
   expected_output: >
-    返回一个详细的内容创作指南JSON对象，包含：
+    返回一个基于推荐选题的具体内容创作指南JSON对象，必须包含：
     - copywriting_guide: 文案创作指南
-      * title_templates: 标题模板列表
-      * opening_hooks: 开头钩子列表
-      * content_frameworks: 正文框架列表
-      * cta_templates: CTA模板列表
-      * tone_guidelines: 语调指南字典
+      * title_templates: 针对每个推荐选题的具体标题模板（包含实际案例）
+      * opening_hooks: 基于用户痛点和选题特点的开头钩子模板
+      * content_frameworks: 针对不同选题类型的正文结构框架
+      * cta_templates: 与选题目标匹配的行动召唤模板
+      * tone_guidelines: 基于目标用户画像的语调指南
+      * storytelling_formulas: 适合各选题的故事叙述公式
+      * persuasion_techniques: 针对用户痛点的说服技巧
     - visual_guide: 配图创作指南
-      * style_direction: 整体风格方向
-      * color_palette: 配色方案列表
-      * composition_rules: 构图规则列表
-      * shooting_tips: 拍摄技巧列表
+      * style_direction: 与选题调性匹配的整体风格方向
+      * color_palette: 基于目标用户偏好的配色方案
+      * composition_rules: 针对选题内容的构图规则
+      * shooting_tips: 针对不同选题场景的拍摄技巧
+      * image_types: 各选题推荐的图片类型和风格
+      * layout_templates: 选题专用的排版模板
     - video_script_guide: 视频脚本指南
-      * script_templates: 脚本模板列表
-      * scene_breakdowns: 场景分解列表
-      * shot_compositions: 镜头构图列表
-      * duration_guidelines: 时长指南字典
-    - creation_workflow: 创作工作流程列表
-    - quality_checklist: 质量检查清单列表
+      * script_templates: 基于推荐选题的具体脚本模板
+      * scene_breakdowns: 每个选题的详细场景分解
+      * shot_compositions: 选题专用的镜头构图建议
+      * duration_guidelines: 基于选题特点的时长建议
+      * opening_sequences: 各选题的开头序列设计
+      * transition_techniques: 适合选题内容的转场技巧
+    - creation_workflow: 针对推荐选题的创作工作流程
+    - quality_checklist: 基于选题要求的质量检查清单
+    - topic_specific_guides: 为每个推荐选题提供的专门创作指导
+      * topic_title: 选题标题
+      * content_angle: 内容切入角度
+      * key_messages: 核心传达信息
+      * execution_steps: 具体执行步骤
+      * success_metrics: 成功评估指标
 
   agent: content_creation_guide
 
+coordinate_strategy_integration: -- todo: 没看到调用？ 
+  description: >
+    统筹整合选题策略、TA策略、创作指导三个维度的结果，制定完整的实战策略：
+    
+    1. **策略整合分析**：
+       - 整合三个维度的策略建议和洞察
+       - 识别策略间的协同效应和潜在冲突
+       - 制定统一的战略框架和执行原则
+    
+    2. **实施计划制定**：
+       - 设计短中长期的执行计划和时间表
+       - 分解具体的行动步骤和责任分工
+       - 制定资源配置和预算规划
+    
+    3. **风险评估与管控**：
+       - 识别实施过程中的潜在风险和挑战
+       - 制定风险缓解策略和应急预案
+       - 建立监控机制和调整策略
+    
+    4. **成效评估体系**：
+       - 设计KPI指标和成功评估标准
+       - 建立数据监测和效果跟踪机制
+       - 制定策略优化和迭代流程
+    
+    **输入数据**：
+    - 目标用户分析结果: {target_audience_strategy}
+    - 选题策略结果: {topic_strategy}
+    - 内容创作指导结果: {content_creation_guide}
+    - 业务背景: {business_context}
+    - 目标产品: {target_product}
+    - 内容分析报告: {analysis_report}
+    - 成功案例数据: {success_cases}
+    
+    **输出要求**：
+    - 生成完整的实战策略报告
+    - 提供具体的执行计划和时间表
+    - 包含风险管控和应急方案
+    - 设计成效评估和优化机制
+
+  expected_output: >
+    返回一个完整的实战策略报告JSON对象，包含：
+    - business_context: 业务背景分析
+    - target_product: 目标产品描述
+    - analysis_base: 分析基础数据摘要
+    - topic_strategy: 完整的选题策略对象
+    - target_audience_strategy: 完整的TA策略对象
+    - content_creation_guide: 完整的创作指导对象
+    - implementation_plan: 实施计划
+      * short_term_goals: 短期目标列表
+      * medium_term_goals: 中期目标列表
+      * long_term_goals: 长期目标列表
+      * priority_actions: 优先行动事项列表
+      * resource_requirements: 资源需求列表
+      * success_metrics: 成功指标列表
+    - key_recommendations: 核心建议列表
+    - success_factors: 成功要素列表
+    - differentiation_points: 差异化要点列表
+    - strategy_version: 策略版本号
+    - generation_timestamp: 生成时间戳
+    - report_summary: 报告摘要
+
+  agent: strategy_coordinator

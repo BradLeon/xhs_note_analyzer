@@ -23,12 +23,14 @@ from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
 
 
-from .models import (
-    ContentAnalysisResult,
+# 从公共模型导入所有分析相关类型
+from xhs_note_analyzer.models import (
     ContentStructureAnalysis,
     EmotionalValueAnalysis,
     VisualElementAnalysis,
-    ContentAnalysisReport
+    ContentAnalysisResult, 
+    ContentAnalysisReport,
+    PatternSynthesisResult
 )
 
 # 导入公共数据模型
@@ -90,6 +92,15 @@ class ContentAnalyzerCrew():
             verbose=True
         )
 
+    @agent
+    def pattern_synthesis_analyst(self) -> Agent:
+        """智能模式合成与成功公式提取专家"""
+        return Agent(
+            config=self.agents_config['pattern_synthesis_analyst'],
+            llm=self.llm,
+            verbose=True
+        )
+
     @task
     def analyze_content_structure_task(self) -> Task:
         """内容结构分析任务"""
@@ -130,6 +141,15 @@ class ContentAnalyzerCrew():
                 self.analyze_visual_elements_task()
             ]
             # 协调任务不需要特定的Pydantic输出，返回Markdown报告即可
+        )
+
+    @task
+    def synthesize_patterns_and_formulas_task(self) -> Task:
+        """智能模式合成与成功公式提取任务"""
+        return Task(
+            config=self.tasks_config['synthesize_patterns_and_formulas'],
+            agent=self.pattern_synthesis_analyst(),
+            output_pydantic=PatternSynthesisResult
         )
 
     @crew
@@ -195,26 +215,32 @@ class ContentAnalyzerCrew():
 
     def analyze_multiple_notes(self, notes_data: List[NoteContentData]) -> ContentAnalysisReport:
         """
-        批量分析多个笔记
+        批量分析多个笔记，并使用LLM智能提取共同模式和成功公式
         
         Args:
             notes_data: List[NoteContentData] 笔记数据列表
             
         Returns:
-            ContentAnalysisReport: 分析报告
+            ContentAnalysisReport: 包含智能模式分析的完整分析报告
         """
         try:
             logger.info(f"🚀 开始批量分析 {len(notes_data)} 个笔记")
             
+            # Step 1: 分析每个笔记
             analysis_results = []
             for note_data in notes_data:
                 result = self.analyze_single_note(note_data)
                 analysis_results.append(result)
             
-            # 生成综合报告
-            report = self._generate_analysis_report(analysis_results)
+            logger.info(f"📊 单笔记分析完成，开始智能模式合成")
             
-            logger.info(f"✅ 批量分析完成，共分析 {len(analysis_results)} 个笔记")
+            # Step 2: 使用LLM智能提取模式和公式
+            pattern_synthesis_result = self._synthesize_patterns_with_llm(analysis_results)
+            
+            # Step 3: 生成整合了智能分析的综合报告
+            report = self._generate_enhanced_analysis_report(analysis_results, pattern_synthesis_result)
+            
+            logger.info(f"✅ 批量分析完成，共分析 {len(analysis_results)} 个笔记，智能提取了 {len(pattern_synthesis_result.success_formulas)} 个成功公式")
             return report
             
         except Exception as e:
@@ -356,16 +382,116 @@ class ContentAnalyzerCrew():
             analysis_timestamp=datetime.now().isoformat()
         )
 
-    def _generate_analysis_report(self, analysis_results: List[ContentAnalysisResult]) -> ContentAnalysisReport:
-        """生成分析报告"""
+    def _synthesize_patterns_with_llm(self, analysis_results: List[ContentAnalysisResult]) -> PatternSynthesisResult:
+        """使用LLM智能合成模式和提取成功公式"""
+        try:
+            logger.info(f"🧠 开始LLM智能模式合成，输入 {len(analysis_results)} 个分析结果")
+            
+            # 准备分析输入数据
+            total_notes = len(analysis_results)
+            average_score = sum(r.overall_score for r in analysis_results) / total_notes if total_notes > 0 else 0.0
+            high_score_notes = [r for r in analysis_results if r.overall_score >= 80.0]
+            high_score_count = len(high_score_notes)
+            
+            # 构建输入数据
+            synthesis_input = {
+                "analysis_results": [result.model_dump() for result in analysis_results],
+                "total_notes": total_notes,
+                "average_score": average_score,
+                "high_score_count": high_score_count
+            }
+            
+            # 创建专门的模式合成Crew来执行LLM分析
+            pattern_crew = Crew(
+                agents=[self.pattern_synthesis_analyst()],
+                tasks=[self.synthesize_patterns_and_formulas_task()],
+                process=Process.sequential,
+                verbose=True
+            )
+            
+            # 执行LLM智能分析
+            pattern_task_result = pattern_crew.kickoff(inputs=synthesis_input)
+            
+            # 解析LLM分析结果
+            if hasattr(pattern_task_result, 'pydantic') and pattern_task_result.pydantic:
+                pattern_result = pattern_task_result.pydantic
+            elif hasattr(pattern_task_result, 'json_dict') and pattern_task_result.json_dict:
+                pattern_result = PatternSynthesisResult(**pattern_task_result.json_dict)
+            else:
+                # 如果LLM任务失败，创建基础结果
+                logger.warning("⚠️ LLM模式合成失败，使用基础合成结果")
+                pattern_result = self._create_basic_pattern_synthesis(analysis_results)
+            
+            return pattern_result
+            
+        except Exception as e:
+            logger.error(f"❌ LLM模式合成失败: {e}")
+            # 返回基础合成结果
+            return self._create_basic_pattern_synthesis(analysis_results)
+
+    def _create_basic_pattern_synthesis(self, analysis_results: List[ContentAnalysisResult]) -> PatternSynthesisResult:
+        """创建基础的模式合成结果（作为LLM分析的备选方案）"""
+        high_score_notes = [r for r in analysis_results if r.overall_score >= 80.0]
+        
+        return PatternSynthesisResult(
+            common_patterns={
+                "结构模式": ["基础结构分析", "标准开头结尾"],
+                "情感模式": ["基础情感触发", "价值主张识别"],
+                "视觉模式": ["基础视觉风格", "色彩搭配"]
+            },
+            success_formulas=[
+                "高质量内容 + 情感共鸣 = 高互动",
+                "清晰结构 + 视觉吸引 = 用户停留"
+            ],
+            pattern_insights={
+                "基础洞察": "需要LLM深度分析获得更准确的洞察"
+            },
+            success_mechanisms=["内容质量", "用户体验", "情感连接"],
+            replication_strategies=["保持内容质量", "注重视觉设计", "建立情感连接"],
+            analysis_timestamp=datetime.now().isoformat(),
+        )
+
+    def _generate_enhanced_analysis_report(self, analysis_results: List[ContentAnalysisResult], 
+                                         pattern_synthesis: PatternSynthesisResult) -> ContentAnalysisReport:
+        """生成整合了智能模式分析的增强分析报告"""
         total_notes = len(analysis_results)
         average_score = sum(r.overall_score for r in analysis_results) / total_notes if total_notes > 0 else 0.0
         
-        # 提取共同模式
-        common_patterns = self._extract_common_patterns(analysis_results)
+        report = ContentAnalysisReport(
+            analysis_results=analysis_results,
+            total_notes=total_notes,
+            average_score=average_score,
+            # 多篇笔记共同模式分析
+            common_patterns=pattern_synthesis.common_patterns,
+            success_formulas=pattern_synthesis.success_formulas,
+            pattern_insights=pattern_synthesis.pattern_insights,
+            success_mechanisms=pattern_synthesis.success_mechanisms,
+            replication_strategies=pattern_synthesis.replication_strategies,
+            report_timestamp=datetime.now().isoformat(),
+            report_summary=f"完成对{total_notes}篇笔记的智能化多维度分析，平均评分{average_score:.1f}，LLM识别{len(pattern_synthesis.success_formulas)}个成功公式"
+        )
         
-        # 总结成功公式
-        success_formulas = self._extract_success_formulas(analysis_results)
+        return report
+
+    def _generate_analysis_report(self, analysis_results: List[ContentAnalysisResult]) -> ContentAnalysisReport:
+        """生成分析报告（向后兼容方法，建议使用智能化的analyze_multiple_notes）"""
+        logger.info("📊 使用基础报告生成方法，建议使用analyze_multiple_notes获得智能化分析")
+        
+        total_notes = len(analysis_results)
+        average_score = sum(r.overall_score for r in analysis_results) / total_notes if total_notes > 0 else 0.0
+        
+        # 使用基础的模式提取（不再依赖机械化方法）
+        common_patterns = {
+            "标题模式": ["待智能分析", "使用analyze_multiple_notes获得详细模式"],
+            "开头策略": ["待智能分析", "使用analyze_multiple_notes获得详细策略"],
+            "视觉风格": ["待智能分析", "使用analyze_multiple_notes获得详细分析"],
+            "互动技巧": ["待智能分析", "推荐使用智能化分析方法"]
+        }
+        
+        success_formulas = [
+            "使用analyze_multiple_notes方法获得LLM智能提取的成功公式",
+            "基础分析建议：保持内容质量 + 关注用户体验"
+        ]
         
         report = ContentAnalysisReport(
             analysis_results=analysis_results,
@@ -374,55 +500,10 @@ class ContentAnalyzerCrew():
             common_patterns=common_patterns,
             success_formulas=success_formulas,
             report_timestamp=datetime.now().isoformat(),
-            report_summary=f"完成对{total_notes}篇笔记的多维度分析，平均评分{average_score:.1f}"
+            report_summary=f"完成对{total_notes}篇笔记的基础多维度分析，平均评分{average_score:.1f}。推荐使用analyze_multiple_notes获得智能化深度分析。"
         )
         
         return report
-
-    def _extract_common_patterns(self, analysis_results: List[ContentAnalysisResult]) -> Dict[str, List[str]]:
-        """提取共同模式"""
-        patterns = {
-            "标题模式": [],
-            "开头策略": [],
-            "视觉风格": [],
-            "互动技巧": []
-        }
-        
-        for result in analysis_results:
-            if result.structure_analysis.title_pattern:
-                patterns["标题模式"].append(result.structure_analysis.title_pattern)
-            if result.structure_analysis.opening_strategy:
-                patterns["开头策略"].append(result.structure_analysis.opening_strategy)
-            if result.visual_analysis.image_style:
-                patterns["视觉风格"].append(result.visual_analysis.image_style)
-        
-        # 去重并保留频次较高的模式
-        for key in patterns:
-            patterns[key] = list(set(patterns[key]))[:5]  # 保留前5个
-        
-        return patterns
-
-    def _extract_success_formulas(self, analysis_results: List[ContentAnalysisResult]) -> List[str]:
-        """提取成功公式"""
-        formulas = []
-        
-        # 基于高分笔记提取成功要素
-        high_score_notes = [r for r in analysis_results if r.overall_score >= 80.0]
-        
-        if high_score_notes:
-            common_factors = []
-            for note in high_score_notes:
-                common_factors.extend(note.success_factors)
-            
-            # 统计频次并提取公式
-            from collections import Counter
-            factor_counts = Counter(common_factors)
-            
-            for factor, count in factor_counts.most_common(5):
-                if count >= len(high_score_notes) * 0.5:  # 超过50%的高分笔记都有此特征
-                    formulas.append(f"{factor} (出现在{count}/{len(high_score_notes)}篇高分笔记中)")
-        
-        return formulas
 
     def save_analysis_results(self, analysis_results, output_dir: str = "output"):
         """保存分析结果到文件"""
@@ -443,19 +524,40 @@ class ContentAnalyzerCrew():
                 # 保存简要文本摘要
                 summary_file = output_path / "content_analysis_summary.txt"
                 with open(summary_file, 'w', encoding='utf-8') as f:
-                    f.write(f"小红书内容分析报告\\n")
+                    f.write(f"小红书内容智能分析报告\\n")
                     f.write("=" * 50 + "\\n\\n")
                     f.write(f"分析笔记数: {analysis_results.total_notes}\\n")
                     f.write(f"平均评分: {analysis_results.average_score:.1f}\\n")
-                    f.write(f"生成时间: {analysis_results.report_timestamp}\\n\\n")
+                    f.write(f"生成时间: {analysis_results.report_timestamp}\\n")
+                    f.write(f"报告摘要: {analysis_results.report_summary}\\n\\n")
                     
-                    f.write("共同模式:\\n")
+                    # LLM识别的共同模式
+                    f.write("🤖 LLM智能识别的共同模式:\\n")
                     for pattern_type, patterns in analysis_results.common_patterns.items():
                         f.write(f"  {pattern_type}: {', '.join(patterns)}\\n")
                     
-                    f.write("\\n成功公式:\\n")
+                    # LLM提取的成功公式
+                    f.write("\\n🎯 LLM智能提取的成功公式:\\n")
                     for i, formula in enumerate(analysis_results.success_formulas, 1):
                         f.write(f"  {i}. {formula}\\n")
+                    
+                    # 模式洞察（新增）
+                    if hasattr(analysis_results, 'pattern_insights') and analysis_results.pattern_insights:
+                        f.write("\\n💡 深度洞察分析:\\n")
+                        for insight_key, insight_value in analysis_results.pattern_insights.items():
+                            f.write(f"  {insight_key}: {insight_value}\\n")
+                    
+                    # 成功机制（新增）
+                    if hasattr(analysis_results, 'success_mechanisms') and analysis_results.success_mechanisms:
+                        f.write("\\n⚙️ 底层成功机制:\\n")
+                        for i, mechanism in enumerate(analysis_results.success_mechanisms, 1):
+                            f.write(f"  {i}. {mechanism}\\n")
+                    
+                    # 复制策略（新增）
+                    if hasattr(analysis_results, 'replication_strategies') and analysis_results.replication_strategies:
+                        f.write("\\n📋 可操作的复制策略:\\n")
+                        for i, strategy in enumerate(analysis_results.replication_strategies, 1):
+                            f.write(f"  {i}. {strategy}\\n")
                 
                 print(f"✅ JSON数据已保存到: {json_file}")
                 print(f"📋 Markdown报告已保存到: {markdown_file}")
@@ -480,27 +582,58 @@ class ContentAnalyzerCrew():
             f.write(f"**报告摘要**: {report.report_summary}\\n\\n")
             
             # 分析概览
-            f.write("## 📊 分析概览\\n\\n")
+            f.write("## 📊 智能分析概览\\n\\n")
             f.write(f"- **分析笔记数**: {report.total_notes}\\n")
             f.write(f"- **平均评分**: {report.average_score:.1f}/100\\n")
-            f.write(f"- **识别成功公式**: {len(report.success_formulas)}\\n")
-            f.write(f"- **提取共同模式**: {len(report.common_patterns)}\\n\\n")
+            f.write(f"- **LLM识别成功公式**: {len(report.success_formulas)}\\n")
+            f.write(f"- **LLM提取共同模式**: {len(report.common_patterns)}\\n")
             
-            # 成功公式
+            # 智能分析额外统计信息
+            if hasattr(report, 'pattern_insights') and report.pattern_insights:
+                f.write(f"- **深度洞察维度**: {len(report.pattern_insights)}\\n")
+            if hasattr(report, 'success_mechanisms') and report.success_mechanisms:
+                f.write(f"- **识别成功机制**: {len(report.success_mechanisms)}\\n")
+            if hasattr(report, 'replication_strategies') and report.replication_strategies:
+                f.write(f"- **提供复制策略**: {len(report.replication_strategies)}\\n")
+            
+            f.write("\\n> 🤖 **采用LLM智能分析技术**，深度挖掘内容成功规律，提供可操作的策略指导\\n\\n")
+            
+            # LLM智能提取的成功公式
             if report.success_formulas:
-                f.write("## 🎯 成功公式\\n\\n")
+                f.write("## 🎯 LLM智能提取的成功公式\\n\\n")
                 for i, formula in enumerate(report.success_formulas, 1):
-                    f.write(f"{i}. {formula}\\n")
+                    f.write(f"{i}. **{formula}**\\n")
                 f.write("\\n")
             
-            # 共同模式
+            # LLM识别的共同模式
             if report.common_patterns:
-                f.write("## 🔍 共同模式分析\\n\\n")
+                f.write("## 🔍 LLM智能识别的共同模式\\n\\n")
                 for pattern_type, patterns in report.common_patterns.items():
                     f.write(f"### {pattern_type}\\n\\n")
                     for pattern in patterns:
                         f.write(f"- {pattern}\\n")
                     f.write("\\n")
+            
+            # 深度洞察分析（新增）
+            if hasattr(report, 'pattern_insights') and report.pattern_insights:
+                f.write("## 💡 深度洞察分析\\n\\n")
+                for insight_key, insight_value in report.pattern_insights.items():
+                    f.write(f"### {insight_key}\\n\\n")
+                    f.write(f"{insight_value}\\n\\n")
+            
+            # 底层成功机制（新增）
+            if hasattr(report, 'success_mechanisms') and report.success_mechanisms:
+                f.write("## ⚙️ 底层成功机制\\n\\n")
+                for i, mechanism in enumerate(report.success_mechanisms, 1):
+                    f.write(f"{i}. **{mechanism}**\\n")
+                f.write("\\n")
+            
+            # 可操作的复制策略（新增）
+            if hasattr(report, 'replication_strategies') and report.replication_strategies:
+                f.write("## 📋 可操作的复制策略\\n\\n")
+                for i, strategy in enumerate(report.replication_strategies, 1):
+                    f.write(f"{i}. **{strategy}**\\n")
+                f.write("\\n")
             
             # 详细分析结果
             f.write("## 📋 详细分析结果\\n\\n")

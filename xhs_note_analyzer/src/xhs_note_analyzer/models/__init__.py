@@ -9,12 +9,24 @@ from .data_models import (
     NoteData,
     NoteContentData,
     ContentAdvice,
-    XHSContentAnalysisState
+    XHSContentAnalysisState,
+    ContentStructureAnalysis,
+    EmotionalValueAnalysis,
+    VisualElementAnalysis,
+    ContentAnalysisResult,
+    ContentAnalysisReport,
+    PatternSynthesisResult
 )
 
 __all__ = [
     "NoteData",
     "NoteContentData", 
     "ContentAdvice",
-    "XHSContentAnalysisState"
+    "XHSContentAnalysisState",
+    "ContentStructureAnalysis",
+    "EmotionalValueAnalysis", 
+    "VisualElementAnalysis",
+    "ContentAnalysisResult",
+    "ContentAnalysisReport",
+    "PatternSynthesisResult"
 ]

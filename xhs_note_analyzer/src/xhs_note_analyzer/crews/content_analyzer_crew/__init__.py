@@ -10,12 +10,15 @@ Content Analyzer Crew
 """
 
 from .content_analyzer_crew import ContentAnalyzerCrew, create_content_analyzer
-from .models import (
-    ContentAnalysisResult,
-    ContentStructureAnalysis, 
+
+# 从公共模型导入所有分析相关类型
+from xhs_note_analyzer.models import (
+    ContentStructureAnalysis,
     EmotionalValueAnalysis,
     VisualElementAnalysis,
-    ContentAnalysisReport
+    ContentAnalysisResult,
+    ContentAnalysisReport,
+    PatternSynthesisResult
 )
 
 __all__ = [
@@ -25,5 +28,6 @@ __all__ = [
     'ContentStructureAnalysis',
     'EmotionalValueAnalysis', 
     'VisualElementAnalysis',
-    'ContentAnalysisReport'
+    'ContentAnalysisReport',
+    'PatternSynthesisResult'
 ]
