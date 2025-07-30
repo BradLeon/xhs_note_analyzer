@@ -205,6 +205,11 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             print("🧠 启动三维度深度内容分析...")
             print(f"📊 待分析笔记数量: {len(self.state.detailed_notes)}")
             
+            # 限制只分析前3个笔记以提高效率
+            analysis_notes = self.state.detailed_notes[:3] if len(self.state.detailed_notes) > 3 else self.state.detailed_notes
+            if len(self.state.detailed_notes) > 3:
+                print(f"✂️ 限制分析数量为3个笔记")
+            
             # 创建内容分析器
             content_analyzer = create_content_analyzer()
             
@@ -215,7 +220,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             print("   3️⃣ 视觉元素分析 (配图风格-排版特点)")
             
             # 批量分析所有笔记
-            analysis_report = content_analyzer.analyze_multiple_notes(self.state.detailed_notes)
+            analysis_report = content_analyzer.analyze_multiple_notes(analysis_notes)
             
             # 保存分析结果
             self.state.content_analysis_report = analysis_report
@@ -231,6 +236,19 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             print(f"   • 平均评分: {analysis_report.average_score:.1f}/100")
             print(f"   • 识别成功公式: {len(analysis_report.success_formulas)}")
             print(f"   • 提取共同模式: {len(analysis_report.common_patterns)}")
+            
+            # 显示成功公式
+            if analysis_report.success_formulas:
+                print(f"\n🎯 识别的成功公式:")
+                for i, formula in enumerate(analysis_report.success_formulas[:3], 1):
+                    print(f"  {i}. {formula}")
+            
+            # 显示共同模式
+            if analysis_report.common_patterns:
+                print(f"\n🔍 发现的共同模式:")
+                for pattern_type, patterns in analysis_report.common_patterns.items():
+                    if patterns:
+                        print(f"  {pattern_type}: {', '.join(patterns[:2])}...")
             
             # 清空旧的兼容性数据，使用新的报告格式
             self.state.content_analysis = []
@@ -287,10 +305,39 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             # 显示策略摘要
             print(f"✅ 实战策略制定完成!")
             print(f"📈 策略摘要:")
-            print(f"   • 选题建议: {len(strategy_report.topic_strategy.trending_topics)}个")
+            print(f"   • 策略版本: {strategy_report.strategy_version}")
+            print(f"   • 有效期: {strategy_report.validity_period}")
             print(f"   • 核心建议: {len(strategy_report.key_recommendations)}条")
             print(f"   • 成功要素: {len(strategy_report.success_factors)}个关键要素")
             print(f"   • 差异化要点: {len(strategy_report.differentiation_points)}个")
+            
+            # 显示核心建议
+            if strategy_report.key_recommendations:
+                print(f"\n🎯 核心建议:")
+                for i, rec in enumerate(strategy_report.key_recommendations[:3], 1):
+                    print(f"  {i}. {rec}")
+            
+            # 显示选题策略
+            if strategy_report.topic_strategy.recommended_topics:
+                print(f"\n📝 选题策略:")
+                print(f"  精选选题数: {len(strategy_report.topic_strategy.recommended_topics)}")
+                for i, topic in enumerate(strategy_report.topic_strategy.recommended_topics[:3], 1):
+                    print(f"    {i}. {topic.title} (优先级: {topic.priority_score}/10)")
+            
+            # 显示TA策略
+            if strategy_report.target_audience_strategy.primary_persona:
+                print(f"\n👥 目标用户画像:")
+                persona = strategy_report.target_audience_strategy.primary_persona
+                for key, value in list(persona.items())[:3]:
+                    print(f"    {key}: {value}")
+            
+            # 显示创作指南
+            print(f"\n🎨 内容创作指南:")
+            guide = strategy_report.content_creation_guide
+            if guide.topic_content_packages:
+                print(f"  选题内容包: {len(guide.topic_content_packages)} 个")
+                for i, package in enumerate(guide.topic_content_packages[:2], 1):
+                    print(f"    {i}. {package.topic_title}")
             
             # 更新最终建议
             self.state.final_recommendations.update({
@@ -354,59 +401,154 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
 
     
     def _convert_api_result_to_note_content(self, note: NoteData, api_result: Dict[str, Any]) -> NoteContentData:
-        """将API返回结果转换为NoteContentData格式"""
+        """将API返回结果转换为NoteContentData格式，适配新的API响应格式"""
         raw_data = api_result.get("data", {})
         
         # 处理图片URL列表
         images = []
         if raw_data.get("images"):
             images = raw_data["images"] if isinstance(raw_data["images"], list) else [raw_data["images"]]
+        elif raw_data.get("image_list"):
+            images = raw_data["image_list"] if isinstance(raw_data["image_list"], list) else [raw_data["image_list"]]
         
-        # 处理作者信息
+        # 处理作者信息 - 适配多种字段名
         author_info = {}
-        if raw_data.get("user_name"):
+        if raw_data.get("nickname"):
+            author_info["name"] = raw_data["nickname"] 
+        elif raw_data.get("user_name"):
             author_info["name"] = raw_data["user_name"]
+        
         if raw_data.get("user_id"):
             author_info["user_id"] = raw_data["user_id"]
-        if raw_data.get("followers_count"):
-            author_info["followers"] = raw_data["followers_count"]
+        if raw_data.get("follower_count"):
+            author_info["followers"] = raw_data["follower_count"]
         
         # 处理标签
         tags = []
         if raw_data.get("tags"):
             tags = raw_data["tags"] if isinstance(raw_data["tags"], list) else [raw_data["tags"]]
-        elif raw_data.get("tag_list"):
-            tags = raw_data["tag_list"]
+        elif raw_data.get("note_tag_list"):
+            # 从note_tag_list提取标签名
+            tag_list = raw_data["note_tag_list"]
+            if isinstance(tag_list, list):
+                tags = [tag.get("name", str(tag)) for tag in tag_list if tag]
         
-        # 更新基础数据统计
-        note.like = raw_data.get("liked_count", note.like)
-        note.collect = raw_data.get("collected_count", note.collect)
-        note.comment = raw_data.get("comments_count", note.comment)
-        note.click = raw_data.get("view_count", note.click)
+        # 处理视频URL
+        video_url = ""
+        if raw_data.get("video_url"):
+            video_url = raw_data["video_url"]
+        elif raw_data.get("video") and isinstance(raw_data["video"], dict):
+            video_url = raw_data["video"].get("url", "")
+        
+        # 处理发布时间
+        create_time = ""
+        if raw_data.get("last_update_time"):
+            create_time = raw_data["last_update_time"]
+        elif raw_data.get("publish_time"):
+            create_time = raw_data["publish_time"]
+        elif raw_data.get("create_time"):
+            create_time = raw_data["create_time"]
         
         return NoteContentData(
-            note_id=note.note_id,
-            title=raw_data.get("title", note.note_title),
+            note_id=raw_data.get("note_id"),
+            title=raw_data.get("title"),
             basic_info=note,
             content=raw_data.get("desc", raw_data.get("content", f"这是{note.note_title}的详细内容...")),
             images=images,
-            video_url=raw_data.get("video_url", ""),
+            video_url=video_url,
             author_info=author_info,
             tags=tags,
-            create_time=raw_data.get("publish_time", raw_data.get("create_time", ""))
+            create_time=create_time
         )
 
     def _create_mock_note_content(self, note: NoteData) -> NoteContentData:
-        """创建模拟笔记内容数据"""
+        """创建模拟笔记内容数据，使用丰富的测试内容"""
+        # 根据笔记类型生成不同的模拟内容
+        if "攻略" in note.note_title or "求职" in note.note_title:
+            content = """🔥国企求职全攻略｜从0到offer的完整路径
+
+📌痛点分析：
+很多小伙伴觉得国企门槛高、竞争激烈，不知道从何入手
+
+✨核心策略：
+1️⃣简历包装：突出稳定性和团队合作能力
+2️⃣笔试准备：行测+专业知识双管齐下  
+3️⃣面试技巧：展现价值观匹配度
+4️⃣内推渠道：学会利用校友资源
+
+💡实用tips：
+• 关注央企官网招聘信息
+• 准备标准化简历模板
+• 模拟面试练习表达能力
+
+想了解更多求职干货，关注我！每天分享职场成长秘籍～"""
+        elif "面试" in note.note_title:
+            content = """央企面试通关秘籍｜让面试官眼前一亮的技巧
+
+🎯面试痛点：
+• 紧张到说不出话
+• 不知道如何展示自己
+• 担心回答不够专业
+
+💪解决方案：
+【自我介绍篇】
+30秒黄金法则：基本信息+核心优势+匹配度
+
+【专业问题篇】
+STAR法则：情境+任务+行动+结果
+
+【压力面试篇】
+保持冷静，逐步分析问题
+
+🔥实战演练：
+问：为什么选择我们公司？
+答：贵公司的企业文化与我的价值观高度匹配，我希望在这里...
+
+记住：面试是双向选择，展现真实的自己！"""
+        elif "简历" in note.note_title or "模板" in note.note_title:
+            content = """📄超实用简历模板免费送｜HR最爱的简历长这样
+
+⚡常见简历问题：
+❌内容冗长，重点不突出
+❌格式混乱，缺乏逻辑
+❌千篇一律，没有亮点
+
+✅优化后的简历模板：
+【基本信息区】
+姓名、联系方式、求职意向
+
+【教育背景】
+学历+GPA+核心课程+获奖情况
+
+【项目经历】 
+项目名称+角色+成果+技能
+
+【实习经历】
+公司+岗位+业绩+收获
+
+📋模板特色：
+🎨简约大气的设计风格
+📊清晰的信息层级结构
+⭐突出个人核心竞争力
+
+💬评论区回复"简历"即可获取模板
+一起助力求职成功！"""
+        else:
+            content = f"这是{note.note_title}的详细内容，包含求职指导、面试技巧和职场建议等相关信息。"
+        
         return NoteContentData(
             note_id=note.note_id,
             title=note.note_title,
             basic_info=note,
-            content=f"这是{note.note_title}的详细内容，包含求职指导、面试技巧和职场建议等相关信息。",
-            images=["https://example.com/image1.jpg", "https://example.com/image2.jpg"],
-            author_info={"name": "求职导师", "followers": 10000, "user_id": "mock_user"},
-            tags=["求职", "国企", "面试", "职场", "指导"],
-            create_time="2024-01-01 12:00:00"
+            content=content,
+            images=[
+                "https://example.com/career-guide-1.jpg",
+                "https://example.com/career-tips-2.jpg", 
+                "https://example.com/interview-skills-3.jpg"
+            ],
+            author_info={"name": "职场导师小王", "followers": 15000, "user_id": "career_mentor_wang"},
+            tags=["国企求职", "面试技巧", "职场攻略", "求职指导", "简历优化"],
+            create_time="2024-01-15 14:30:00"
         )
 
 
@@ -516,7 +658,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
         # 策略制定结果
         if self.state.strategy_completed and self.state.strategy_report:
             print(f"🚀 策略制定: 已完成")
-            print(f"   • 选题建议: {len(self.state.strategy_report.topic_strategy.trending_topics)}个")
+            print(f"   • 选题建议: {len(self.state.strategy_report.topic_strategy.recommended_topics)}个")
             print(f"   • 核心建议: {len(self.state.strategy_report.key_recommendations)}条")
             print(f"   • 成功要素: {len(self.state.strategy_report.success_factors)}个")
         else:

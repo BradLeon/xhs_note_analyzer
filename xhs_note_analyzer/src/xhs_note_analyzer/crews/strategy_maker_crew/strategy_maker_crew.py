@@ -23,13 +23,15 @@ from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
 
 from .models import (
+    RecommendedTopic,
     TopicStrategy,
     TargetAudienceStrategy,
     ContentCreationGuide,
-    CopywritingGuide,
-    VisualGuide,
-    VideoScriptGuide,
-    TopicSpecificGuide,
+    CompleteCopywriting,
+    VideoScript,
+    ImageDescription,
+    TopicContentPackage,
+    OverallExecutionTips,
     StrategyReport
 )
 
@@ -81,14 +83,6 @@ class StrategyMakerCrew():
             verbose=True
         )
 
-    @agent
-    def strategy_integration_coordinator(self) -> Agent:
-        """策略整合协调专家"""
-        return Agent(
-            config=self.agents_config['strategy_integration_coordinator'],
-            llm=self.llm,
-            verbose=True
-        )
 
 
     @task
@@ -123,19 +117,6 @@ class StrategyMakerCrew():
             output_pydantic=ContentCreationGuide
         )
 
-    @task
-    def coordinate_strategy_integration_task(self) -> Task:
-        """策略整合协调任务 - 第四步，整合所有策略"""
-        return Task(
-            config=self.tasks_config['coordinate_strategy_integration'],
-            agent=self.strategy_integration_coordinator(),
-            context=[
-                self.analyze_target_audience_task(),
-                self.develop_topic_strategy_task(),
-                self.create_content_creation_guide_task()
-            ],
-            output_pydantic=StrategyReport
-        )
 
 
     @crew
@@ -145,14 +126,12 @@ class StrategyMakerCrew():
             agents=[
                 self.target_audience_analyst(),
                 self.topic_strategy_expert(),
-                self.content_creation_guide(),
-                self.strategy_integration_coordinator()
+                self.content_creation_guide()
             ],
             tasks=[
                 self.analyze_target_audience_task(),
                 self.develop_topic_strategy_task(),
-                self.create_content_creation_guide_task(),
-                self.coordinate_strategy_integration_task()
+                self.create_content_creation_guide_task()
             ],
             process=Process.sequential,
             verbose=True
@@ -207,200 +186,129 @@ class StrategyMakerCrew():
                                business_goals: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """准备策略制定的输入数据"""
         
-        # 提取内容分析的关键洞察
-        success_cases = []
-        if content_analysis_report and content_analysis_report.analysis_results:
-            for result in content_analysis_report.analysis_results:
-                success_cases.append({
-                    "note_title": result.note_title,
-                    "overall_score": result.overall_score,
-                    "success_factors": result.success_factors,
-                    "structure_insights": {
-                        "title_pattern": result.structure_analysis.title_pattern,
-                        "opening_strategy": result.structure_analysis.opening_strategy,
-                        "content_framework": result.structure_analysis.content_framework
-                    },
-                    "emotional_insights": {
-                        "pain_points": result.emotional_analysis.pain_points,
-                        "value_propositions": result.emotional_analysis.value_propositions,
-                        "emotional_triggers": result.emotional_analysis.emotional_triggers
-                    },
-                    "visual_insights": {
-                        "image_style": result.visual_analysis.image_style,
-                        "color_scheme": result.visual_analysis.color_scheme,
-                        "layout_style": result.visual_analysis.layout_style
-                    }
-                })
-        
         # 构建策略输入
         strategy_input = {
             "business_context": business_context,
             "target_product": target_product,
+            "business_goals": business_goals,
             "analysis_report": content_analysis_report.model_dump() if content_analysis_report else {},
-            #"success_cases": success_cases, 摘取的数据太片面，且内容属于content_analysis_report的子集
-            "user_insights": self._extract_user_insights(content_analysis_report), # 主要包括痛点、价值主张、情绪触点
-            #"behavior_analysis": self._extract_behavior_patterns(content_analysis_report), #现有输入无法提取有价值的用户行为
-            "content_analysis": self._extract_content_patterns(content_analysis_report),
             "success_factors": content_analysis_report.success_formulas if content_analysis_report else [],
-            "visual_insights": self._extract_visual_patterns(content_analysis_report),
-            "creation_requirements": business_goals or {}
         }
         
         return strategy_input
 
-    def _extract_user_insights(self, report: 'ContentAnalysisReport') -> Dict[str, Any]:
-        """从分析报告中提取用户洞察"""
-        if not report or not report.analysis_results:
-            return {}
-        
-        # 聚合用户相关的洞察
-        all_pain_points = []
-        all_value_props = []
-        all_triggers = []
-        
-        for result in report.analysis_results:
-            all_pain_points.extend(result.emotional_analysis.pain_points)
-            all_value_props.extend(result.emotional_analysis.value_propositions)
-            all_triggers.extend(result.emotional_analysis.emotional_triggers)
-        
-        return {
-            "common_pain_points": list(set(all_pain_points)),
-            "value_propositions": list(set(all_value_props)),
-            "emotional_triggers": list(set(all_triggers))
-        }
-
-    def _extract_behavior_patterns(self, report: 'ContentAnalysisReport') -> Dict[str, Any]:
-        """提取用户行为模式"""
-        if not report or not report.analysis_results:
-            return {}
-        
-        patterns = {
-            "high_engagement_patterns": [],
-            "content_preferences": [],
-            "interaction_styles": []
-        }
-        
-        # 基于高分内容提取行为模式
-        high_score_content = [r for r in report.analysis_results if r.overall_score >= 80.0]
-        
-        for result in high_score_content:
-            if result.success_factors:
-                patterns["high_engagement_patterns"].extend(result.success_factors)
-        
-        return patterns
-
-    def _extract_content_patterns(self, report: 'ContentAnalysisReport') -> Dict[str, Any]:
-        """提取内容创作模式"""
-        if not report or not report.analysis_results:
-            return {}
-        
-        patterns = {
-            "successful_structures": [],
-            "effective_openings": [],
-            "winning_frameworks": []
-        }
-        
-        for result in report.analysis_results:
-            if result.structure_analysis.title_pattern:
-                patterns["successful_structures"].append(result.structure_analysis.title_pattern)
-            if result.structure_analysis.opening_strategy:
-                patterns["effective_openings"].append(result.structure_analysis.opening_strategy)
-            if result.structure_analysis.content_framework:
-                patterns["winning_frameworks"].append(result.structure_analysis.content_framework)
-            # content_logic?
-        
-        return patterns
-
-    def _extract_visual_patterns(self, report: 'ContentAnalysisReport') -> Dict[str, Any]:
-        """提取视觉设计模式"""
-        if not report or not report.analysis_results:
-            return {}
-        
-        patterns = {
-            "popular_styles": [],
-            "effective_colors": [],
-            "layout_trends": []
-        }
-        
-        for result in report.analysis_results:
-            if result.visual_analysis.image_style:
-                patterns["popular_styles"].append(result.visual_analysis.image_style)
-            if result.visual_analysis.color_scheme:
-                patterns["effective_colors"].append(result.visual_analysis.color_scheme)
-            if result.visual_analysis.layout_style:
-                patterns["layout_trends"].append(result.visual_analysis.layout_style)
-        
-        return patterns
 
     def _integrate_strategy_results(self, crew_results, strategy_input: Dict[str, Any]) -> StrategyReport:
-        """整合三个任务的结果为完整策略报告"""
+        """直接汇总三个任务的结果为结构化策略报告"""
         try:
-            # CrewAI执行结果通常是最后一个任务的输出
-            # 但我们需要从结果中提取各个任务的输出
+            logger.info("🔄 开始汇总三个任务结果")
             
-            # 解析结果
-            if isinstance(crew_results, str):
-                # 如果是字符串，尝试解析为JSON
-                try:
-                    results_data = json.loads(crew_results)
-                except:
-                    # 如果无法解析，创建基础结构
-                    results_data = self._parse_text_results(crew_results)
+            # 从crew_results中提取三个任务的输出
+            if hasattr(crew_results, 'tasks_output') and crew_results.tasks_output:
+                # 按顺序获取三个任务的结果
+                task_outputs = crew_results.tasks_output
+                logger.info(f"📋 获取到 {len(task_outputs)} 个任务输出")
+                
+                # 初始化任务结果
+                target_audience_result = None
+                topic_strategy_result = None
+                content_creation_result = None
+                
+                # 解析各任务结果
+                for i, task_output in enumerate(task_outputs):
+                    if hasattr(task_output, 'pydantic') and task_output.pydantic:
+                        if i == 0:  # analyze_target_audience_task
+                            target_audience_result = task_output.pydantic
+                            logger.info("✅ 获取到用户分析结果")
+                        elif i == 1:  # develop_topic_strategy_task
+                            topic_strategy_result = task_output.pydantic
+                            logger.info("✅ 获取到选题策略结果")
+                        elif i == 2:  # create_content_creation_guide_task
+                            content_creation_result = task_output.pydantic
+                            logger.info("✅ 获取到内容创作结果")
+                
+                # 如果某些结果为空，使用默认值
+                if not target_audience_result:
+                    target_audience_result = TargetAudienceStrategy(**self._create_basic_ta_strategy(strategy_input))
+                    logger.warning("⚠️ 用户分析结果为空，使用默认值")
+                    
+                if not topic_strategy_result:
+                    topic_strategy_result = TopicStrategy(**self._create_basic_topic_strategy(strategy_input))
+                    logger.warning("⚠️ 选题策略结果为空，使用默认值")
+                    
+                if not content_creation_result:
+                    content_creation_result = ContentCreationGuide(**self._create_basic_content_guide(strategy_input))
+                    logger.warning("⚠️ 内容创作结果为空，使用默认值")
+                
             else:
-                results_data = crew_results if isinstance(crew_results, dict) else {}
-            
-            # 提取各个策略组件
-            topic_strategy = TopicStrategy(**results_data.get("topic_strategy", self._create_basic_topic_strategy(strategy_input)))
-            target_audience_strategy = TargetAudienceStrategy(**results_data.get("target_audience_strategy", self._create_basic_ta_strategy(strategy_input)))
-            
-            # 创建内容创作指南
-            content_guide_data = results_data.get("content_creation_guide", self._create_basic_content_guide(strategy_input))
-            copywriting_guide = CopywritingGuide(**content_guide_data.get("copywriting_guide", {}))
-            visual_guide = VisualGuide(**content_guide_data.get("visual_guide", {}))
-            video_script_guide = VideoScriptGuide(**content_guide_data.get("video_script_guide", {}))
-            
-            # 处理topic_specific_guides
-            topic_guides = []
-            for guide_data in content_guide_data.get("topic_specific_guides", []):
-                topic_guides.append(TopicSpecificGuide(**guide_data))
-            
-            content_creation_guide = ContentCreationGuide(
-                copywriting_guide=copywriting_guide,
-                visual_guide=visual_guide,
-                video_script_guide=video_script_guide,
-                creation_workflow=content_guide_data.get("creation_workflow", []),
-                quality_checklist=content_guide_data.get("quality_checklist", []),
-                topic_specific_guides=topic_guides
-            )
+                # 如果无法获取任务输出，使用默认值
+                logger.warning("⚠️ 无法获取任务输出，使用默认策略")
+                target_audience_result = TargetAudienceStrategy(**self._create_basic_ta_strategy(strategy_input))
+                topic_strategy_result = TopicStrategy(**self._create_basic_topic_strategy(strategy_input))
+                content_creation_result = ContentCreationGuide(**self._create_basic_content_guide(strategy_input))
             
             # 生成综合建议
             key_recommendations = self._generate_key_recommendations(
-                topic_strategy, target_audience_strategy, content_creation_guide
+                topic_strategy_result, target_audience_result, content_creation_result
             )
             
-            # 创建完整策略报告
+            # 创建结构化策略报告
             strategy_report = StrategyReport(
                 business_context=strategy_input["business_context"],
                 target_product=strategy_input["target_product"],
-                analysis_base=f"基于{len(strategy_input.get('success_cases', []))}个成功案例的分析",
-                topic_strategy=topic_strategy,
-                target_audience_strategy=target_audience_strategy,
-                content_creation_guide=content_creation_guide,
+                analysis_base=f"基于内容分析报告的三维度策略制定",
+                topic_strategy=topic_strategy_result,
+                target_audience_strategy=target_audience_result,
+                content_creation_guide=content_creation_result,
                 key_recommendations=key_recommendations,
-                success_factors=results_data.get("success_factors", []),
-                differentiation_points=results_data.get("differentiation_points", []),
+                success_factors=strategy_input.get("success_factors", []),
+                differentiation_points=self._extract_differentiation_points(
+                    topic_strategy_result, target_audience_result, content_creation_result
+                ),
                 generation_timestamp=datetime.now().isoformat(),
-                report_summary=f"针对{strategy_input['target_product']}的三维度实战策略制定完成"
+                report_summary=f"针对{strategy_input['target_product']}的完整策略制定：用户分析+选题策略+创作指导"
             )
             
+            logger.info("✅ 策略结果汇总完成")
             return strategy_report
             
         except Exception as e:
-            logger.warning(f"⚠️ 整合策略结果失败，使用fallback: {e}")
+            logger.error(f"❌ 汇总策略结果失败: {e}")
+            logger.error(f"错误详情: {str(e)}")
+            import traceback
+            logger.error(f"堆栈跟踪: {traceback.format_exc()}")
             return self._create_fallback_strategy(
                 strategy_input["business_context"], 
                 strategy_input["target_product"]
             )
+
+    def _extract_differentiation_points(self, topic_strategy: TopicStrategy, 
+                                      target_audience_strategy: TargetAudienceStrategy,
+                                      content_creation_guide: ContentCreationGuide) -> List[str]:
+        """从三个策略组件中提取差异化要点"""
+        differentiation_points = []
+        
+        # 从选题策略中提取差异化点
+        if hasattr(topic_strategy, 'recommended_topics') and topic_strategy.recommended_topics:
+            differentiation_points.append(f"聚焦{len(topic_strategy.recommended_topics)}个精选选题方向")
+        
+        # 从用户策略中提取差异化点
+        if hasattr(target_audience_strategy, 'core_needs') and target_audience_strategy.core_needs:
+            differentiation_points.append(f"针对用户{len(target_audience_strategy.core_needs)}大核心需求")
+            
+        # 从创作指导中提取差异化点
+        if hasattr(content_creation_guide, 'topic_content_packages') and content_creation_guide.topic_content_packages:
+            differentiation_points.append(f"提供{len(content_creation_guide.topic_content_packages)}个完整的创作素材包")
+            
+        # 默认差异化要点
+        if not differentiation_points:
+            differentiation_points = [
+                "基于数据分析的精准策略制定",
+                "完整的创作执行指导",
+                "结构化的用户需求匹配"
+            ]
+            
+        return differentiation_points
 
     def _parse_text_results(self, text_results: str) -> Dict[str, Any]:
         """从文本结果中解析策略信息"""
@@ -454,47 +362,57 @@ class StrategyMakerCrew():
         }
 
     def _create_basic_content_guide(self, strategy_input: Dict[str, Any]) -> Dict[str, Any]:
-        """创建基础内容创作指南"""
+        """创建基础内容创作指南 - 返回匹配新ContentCreationGuide模型的数据"""
         target_product = strategy_input.get("target_product", "")
         business_context = strategy_input.get("business_context", "")
         
         return {
-            "copywriting_guide": {
-                "title_templates": ["如何...", "...的N个方法", "...攻略分享"],
-                "opening_hooks": ["痛点开头", "数据开头", "故事开头"],
-                "content_frameworks": ["AIDA框架", "问题-解决方案-结果", "故事-观点-行动"],
-                "storytelling_formulas": ["英雄之旅", "冲突-解决", "前后对比"],
-                "persuasion_techniques": ["社会认同", "稀缺性", "权威背书"],
-                "cta_templates": ["立即行动", "了解更多", "分享经验"],
-                "tone_guidelines": {"正式度": "亲和", "情感色彩": "积极", "专业度": "实用"}
-            },
-            "visual_guide": {
-                "style_direction": "简约清新",
-                "color_palette": ["#F5F5F5", "#333333", "#FF6B6B"],
-                "image_types": ["生活场景", "产品展示", "信息图表"],
-                "composition_rules": ["三分法则", "对称构图", "引导线构图"],
-                "layout_templates": ["九宫格", "左右分屏", "上下分层"],
-                "shooting_tips": ["自然光拍摄", "多角度取景", "细节特写"]
-            },
-            "video_script_guide": {
-                "script_templates": ["开头-正文-结尾", "问题-解决-总结"],
-                "opening_sequences": ["疑问式开头", "冲突式开头", "数据式开头"],
-                "scene_breakdowns": [{"场景1": "开场介绍"}, {"场景2": "核心内容"}, {"场景3": "总结呼吁"}],
-                "shot_compositions": ["中景介绍", "特写强调", "全景总结"],
-                "transition_techniques": ["淡入淡出", "快切", "旋转过渡"],
-                "duration_guidelines": {"短视频": "15-60秒", "长视频": "3-10分钟"}
-            },
-            "creation_workflow": ["选题确定", "内容策划", "素材准备", "制作执行", "发布优化"],
-            "quality_checklist": ["标题吸引力", "内容价值度", "视觉美观度", "互动引导性"],
-            "topic_specific_guides": [
+            "topic_content_packages": [
                 {
                     "topic_title": f"{target_product}基础选题示例",
-                    "content_angle": f"基于{business_context}的实用价值导向",
-                    "key_messages": ["解决用户痛点", "提供实用技巧", "引发共鸣"],
-                    "execution_steps": ["确定核心价值", "搭建内容框架", "制作视觉素材", "优化发布策略"],
-                    "success_metrics": ["点赞率>5%", "评论率>2%", "分享率>1%"]
+                    "business_value": f"基于{business_context}的实用价值导向，提升用户对{target_product}的认知和转化",
+                    "target_pain_point": "用户缺乏相关知识和解决方案",
+                    "complete_copywriting": {
+                        "complete_title": f"新手必看！{target_product}完整攻略",
+                        "full_content": f"你是否还在为{target_product}相关问题而困扰？\n\n今天给大家分享一个完整的解决方案...\n\n[具体步骤和方法]\n\n最后总结：掌握这些技巧，你也能...\n\n💡 关注我，了解更多{target_product}相关内容",
+                        "content_length": 200,
+                        "posting_time_suggestion": "晚上8-10点",
+                        "content_type": "图文笔记"
+                    },
+                    "video_script": None,  # 图文笔记不需要视频脚本
+                    "image_descriptions": [
+                        {
+                            "image_purpose": "首图",
+                            "composition_details": "清晰的标题文字 + 产品/场景展示",
+                            "character_appearance": "年轻专业人士，简洁着装",
+                            "environment_setting": "简洁明亮的背景，突出主题",
+                            "lighting_and_tone": "自然光，清新明亮的色调",
+                            "ai_prompt_ready": "clean background, professional person, bright lighting, minimalist design"
+                        },
+                        {
+                            "image_purpose": "内容图",
+                            "composition_details": "步骤说明 + 示例展示",
+                            "character_appearance": "与首图保持一致",
+                            "environment_setting": "实际操作场景",
+                            "lighting_and_tone": "自然光，专业感",
+                            "ai_prompt_ready": "step-by-step guide, clean layout, professional presentation"
+                        },
+                        {
+                            "image_purpose": "产品图",
+                            "composition_details": "产品特写 + 使用效果展示",
+                            "character_appearance": "手部特写或使用场景",
+                            "environment_setting": "简洁背景，突出产品",
+                            "lighting_and_tone": "柔和光线，突出质感",
+                            "ai_prompt_ready": "product showcase, soft lighting, clean background, high quality"
+                        }
+                    ]
                 }
-            ]
+            ],
+            "overall_execution_tips": {
+                "content_quality_standards": ["标题吸引力强", "内容有实用价值", "视觉美观度高", "互动引导清晰"],
+                "platform_best_practices": ["使用相关话题标签", "发布时间选择用户活跃期", "积极回复评论互动"],
+                "engagement_optimization": ["设置互动问题", "引导用户分享经验", "及时回复评论建立连接"]
+            }
         }
 
     def _generate_key_recommendations(self, topic_strategy: TopicStrategy, 
@@ -504,16 +422,16 @@ class StrategyMakerCrew():
         recommendations = []
         
         # 基于选题策略的建议
-        if topic_strategy.trending_topics:
-            recommendations.append(f"重点关注{len(topic_strategy.trending_topics)}个热门选题方向")
+        if topic_strategy.recommended_topics:
+            recommendations.append(f"重点关注{len(topic_strategy.recommended_topics)}个精选选题方向")
         
         # 基于TA策略的建议  
         if target_audience_strategy.core_needs:
             recommendations.append(f"聚焦用户{len(target_audience_strategy.core_needs)}大核心需求")
             
         # 基于创作指南的建议
-        if content_creation_guide.copywriting_guide.title_templates:
-            recommendations.append("使用标准化的标题模板提升点击率")
+        if content_creation_guide.topic_content_packages:
+            recommendations.append(f"提供{len(content_creation_guide.topic_content_packages)}个完整的创作素材包")
             
         # 默认通用建议
         if not recommendations:
@@ -524,11 +442,22 @@ class StrategyMakerCrew():
     def _create_fallback_strategy(self, business_context: str, target_product: str) -> StrategyReport:
         """创建备用策略报告"""
         
-        # 基础选题策略
+        # 基础选题策略 - 使用recommended_topics而不是trending_topics
+        recommended_topics = [
+            RecommendedTopic(
+                title="热门话题1",
+                rationale="基础话题选择理由",
+                target_audience="目标用户群体",
+                expected_engagement="高互动预期",
+                execution_difficulty="中等",
+                priority_score=8
+            )
+        ]
+        
         topic_strategy = TopicStrategy(
             business_domain=business_context,
             target_product=target_product,
-            trending_topics=["热门话题1", "热门话题2", "热门话题3"],
+            recommended_topics=recommended_topics,
             topic_formulas=["数字型标题", "疑问型标题", "对比型标题"]
         )
         
@@ -538,37 +467,60 @@ class StrategyMakerCrew():
             core_needs=["效率提升", "技能学习", "职业发展"]
         )
         
-        # 基础创作指南
-        copywriting_guide = CopywritingGuide(
-            title_templates=["如何...", "...的N个方法", "...攻略分享"],
-            opening_hooks=["痛点开头", "数据开头", "故事开头"]
+        # 基础创作指南 - 使用新的模型结构
+        complete_copywriting = CompleteCopywriting(
+            complete_title=f"新手必看！{target_product}基础攻略",
+            full_content=f"你是否还在为{target_product}相关问题而困扰？\\n\\n今天给大家分享一个完整的解决方案...\\n\\n最后总结：掌握这些技巧，你也能...\\n\\n💡 关注我，了解更多相关内容",
+            content_length=180,
+            posting_time_suggestion="晚上8-10点",
+            content_type="图文笔记"
         )
         
-        visual_guide = VisualGuide(
-            style_direction="简约清新",
-            color_palette=["#F5F5F5", "#333333", "#FF6B6B"]
-        )
+        image_descriptions = [
+            ImageDescription(
+                image_purpose="首图",
+                composition_details="清晰的标题文字 + 产品展示",
+                character_appearance="年轻专业人士，简洁着装",
+                environment_setting="简洁明亮的背景",
+                lighting_and_tone="自然光，清新明亮的色调",
+                ai_prompt_ready="clean background, professional person, bright lighting"
+            ),
+            ImageDescription(
+                image_purpose="内容图",
+                composition_details="步骤说明 + 示例展示",
+                character_appearance="与首图保持一致",
+                environment_setting="实际操作场景",
+                lighting_and_tone="自然光，专业感",
+                ai_prompt_ready="step-by-step guide, clean layout"
+            ),
+            ImageDescription(
+                image_purpose="产品图",
+                composition_details="产品特写 + 使用效果展示",
+                character_appearance="手部特写或使用场景",
+                environment_setting="简洁背景，突出产品",
+                lighting_and_tone="柔和光线，突出质感",
+                ai_prompt_ready="product showcase, soft lighting, clean background"
+            )
+        ]
         
-        video_script_guide = VideoScriptGuide(
-            script_templates=["开头-正文-结尾", "问题-解决-总结"]
-        )
-        
-        # 基础选题指导
-        topic_specific_guide = TopicSpecificGuide(
+        topic_content_package = TopicContentPackage(
             topic_title="基础选题示例",
-            content_angle="实用价值导向",
-            key_messages=["解决用户痛点", "提供实用技巧", "引发共鸣"],
-            execution_steps=["确定核心价值", "搭建内容框架", "制作视觉素材", "优化发布策略"],
-            success_metrics=["点赞率>5%", "评论率>2%", "分享率>1%"]
+            business_value=f"基于{business_context}的实用价值导向",
+            target_pain_point="用户缺乏相关知识和解决方案",
+            complete_copywriting=complete_copywriting,
+            video_script=None,  # 图文笔记不需要视频脚本
+            image_descriptions=image_descriptions
+        )
+        
+        overall_execution_tips = OverallExecutionTips(
+            content_quality_standards=["标题吸引力强", "内容有实用价值", "视觉美观度高"],
+            platform_best_practices=["使用相关话题标签", "发布时间选择用户活跃期", "积极回复评论互动"],
+            engagement_optimization=["设置互动问题", "引导用户分享经验", "及时回复评论"]
         )
         
         content_creation_guide = ContentCreationGuide(
-            copywriting_guide=copywriting_guide,
-            visual_guide=visual_guide,
-            video_script_guide=video_script_guide,
-            creation_workflow=["选题确定", "内容策划", "素材准备", "制作执行", "发布优化"],
-            quality_checklist=["标题吸引力", "内容价值度", "视觉美观度", "互动引导性"],
-            topic_specific_guides=[topic_specific_guide]
+            topic_content_packages=[topic_content_package],
+            overall_execution_tips=overall_execution_tips
         )
         
         return StrategyReport(
@@ -651,10 +603,13 @@ class StrategyMakerCrew():
             # 选题策略
             f.write("## 📝 选题策略\\n\\n")
             topic = report.topic_strategy
-            if topic.trending_topics:
-                f.write("### 热门选题\\n\\n")
-                for topic_item in topic.trending_topics:
-                    f.write(f"- {topic_item}\\n")
+            if topic.recommended_topics:
+                f.write("### 精选推荐选题\\n\\n")
+                for topic_item in topic.recommended_topics:
+                    # topic_item是RecommendedTopic对象，访问其title属性
+                    f.write(f"- **{topic_item.title}** (优先级: {topic_item.priority_score}/10)\\n")
+                    f.write(f"  - 理由: {topic_item.rationale}\\n")
+                    f.write(f"  - 目标用户: {topic_item.target_audience}\\n")
                 f.write("\\n")
             
             if topic.topic_formulas:
@@ -682,23 +637,46 @@ class StrategyMakerCrew():
             f.write("## 🎨 内容创作指南\\n\\n")
             guide = report.content_creation_guide
             
-            # 文案指南
-            f.write("### 文案创作\\n\\n")
-            if guide.copywriting_guide.title_templates:
-                f.write("**标题模板**:\\n")
-                for template in guide.copywriting_guide.title_templates:
-                    f.write(f"- {template}\\n")
-                f.write("\\n")
+            # 选题内容包
+            if guide.topic_content_packages:
+                f.write("### 选题内容包\\n\\n")
+                for i, package in enumerate(guide.topic_content_packages, 1):
+                    f.write(f"#### {i}. {package.topic_title}\\n\\n")
+                    f.write(f"**商业价值**: {package.business_value}\\n\\n")
+                    f.write(f"**目标痛点**: {package.target_pain_point}\\n\\n")
+                    
+                    # 完整文案
+                    if package.complete_copywriting:
+                        f.write("**完整文案**:\\n")
+                        f.write(f"- **标题**: {package.complete_copywriting.complete_title}\\n")
+                        f.write(f"- **内容类型**: {package.complete_copywriting.content_type}\\n")
+                        f.write(f"- **字数**: {package.complete_copywriting.content_length}\\n")
+                        f.write("\\n")
+                    
+                    # 配图描述
+                    if package.image_descriptions:
+                        f.write(f"**配图描述** ({len(package.image_descriptions)}张):\\n")
+                        for j, img_desc in enumerate(package.image_descriptions, 1):
+                            f.write(f"  {j}. **{img_desc.image_purpose}**: {img_desc.composition_details}\\n")
+                        f.write("\\n")
+                    
+                    f.write("---\\n\\n")
             
-            # 视觉指南
-            f.write("### 视觉设计\\n\\n")
-            if guide.visual_guide.style_direction:
-                f.write(f"**整体风格**: {guide.visual_guide.style_direction}\\n\\n")
-            
-            if guide.visual_guide.color_palette:
-                f.write("**配色方案**: ")
-                f.write(", ".join(guide.visual_guide.color_palette))
-                f.write("\\n\\n")
+            # 整体执行建议
+            if hasattr(guide, 'overall_execution_tips') and guide.overall_execution_tips:
+                f.write("### 整体执行建议\\n\\n")
+                tips = guide.overall_execution_tips
+                if tips.content_quality_standards:
+                    f.write("**内容质量标准**:\\n")
+                    for standard in tips.content_quality_standards:
+                        f.write(f"- {standard}\\n")
+                    f.write("\\n")
+                
+                if tips.platform_best_practices:
+                    f.write("**平台最佳实践**:\\n")
+                    for practice in tips.platform_best_practices:
+                        f.write(f"- {practice}\\n")
+                    f.write("\\n")
             
             # 差异化要点
             if report.differentiation_points:

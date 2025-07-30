@@ -139,26 +139,53 @@ class TopicSpecificGuide(BaseModel):
     success_metrics: List[str] = Field(default_factory=list, description="成功评估指标")
 
 
+# 新的内容创作模型，匹配tasks.yaml的expected_output
+
+class CompleteCopywriting(BaseModel):
+    """完整文案模型"""
+    complete_title: str = Field(description="完整标题（可直接使用）")
+    full_content: str = Field(description="完整正文内容（开头+正文+结尾+CTA）")
+    content_length: int = Field(description="字数统计")
+    posting_time_suggestion: str = Field(description="建议发布时间")
+    content_type: str = Field(description="内容形式（图文笔记/视频笔记）")
+
+class VideoScript(BaseModel):
+    """视频脚本模型"""
+    character_profile: str = Field(description="出镜人物详细设定（年龄、职业、穿着、性格）")
+    timeline_script: str = Field(description="按秒标注的时间轴脚本")
+    scene_description: str = Field(description="拍摄场景详细描述")
+    dialogue_with_emotion: str = Field(description="逐句台词（含语调和情感提示）")
+    camera_directions: str = Field(description="镜头切换指导")
+    props_and_setup: str = Field(description="道具和布景要求")
+
+class ImageDescription(BaseModel):
+    """配图描述模型"""
+    image_purpose: str = Field(description="图片用途（首图/内容图/产品图）")
+    composition_details: str = Field(description="画面构成详细描述")
+    character_appearance: str = Field(description="人物外观详细描述")
+    environment_setting: str = Field(description="环境和氛围描述")
+    lighting_and_tone: str = Field(description="光线和色调要求")
+    ai_prompt_ready: str = Field(description="可直接用于AI绘图的提示词")
+
+class TopicContentPackage(BaseModel):
+    """选题内容包模型"""
+    topic_title: str = Field(description="选题标题")
+    business_value: str = Field(description="该选题的商业价值和转化逻辑")
+    target_pain_point: str = Field(description="针对的用户痛点")
+    complete_copywriting: CompleteCopywriting = Field(description="一个完整文案")
+    video_script: Optional[VideoScript] = Field(default=None, description="视频脚本（仅当content_type为视频笔记时提供）")
+    image_descriptions: List[ImageDescription] = Field(default_factory=list, description="配图描述列表(3-5张)")
+
+class OverallExecutionTips(BaseModel):
+    """整体执行建议模型"""
+    content_quality_standards: List[str] = Field(default_factory=list, description="内容质量标准")
+    platform_best_practices: List[str] = Field(default_factory=list, description="小红书平台最佳实践")
+    engagement_optimization: List[str] = Field(default_factory=list, description="互动优化建议")
+
 class ContentCreationGuide(BaseModel):
-    """内容创作指南综合模型"""
-    
-    # 三大创作指南
-    copywriting_guide: CopywritingGuide
-    visual_guide: VisualGuide
-    video_script_guide: VideoScriptGuide
-    
-    # 创作流程
-    creation_workflow: List[str] = Field(default_factory=list, description="针对推荐选题的创作工作流程")
-    quality_checklist: List[str] = Field(default_factory=list, description="基于选题要求的质量检查清单")
-    optimization_tips: List[str] = Field(default_factory=list, description="优化技巧")
-    
-    # 选题专项指导
-    topic_specific_guides: List[TopicSpecificGuide] = Field(default_factory=list, description="为每个推荐选题提供的专门创作指导")
-    
-    # 发布策略
-    posting_schedule: Dict[str, str] = Field(default_factory=dict, description="发布时间表")
-    hashtag_strategy: List[str] = Field(default_factory=list, description="标签策略")
-    engagement_tactics: List[str] = Field(default_factory=list, description="互动策略")
+    """内容创作执行手册模型 - 匹配tasks.yaml输出"""
+    topic_content_packages: List[TopicContentPackage] = Field(default_factory=list, description="选题内容包列表")
+    overall_execution_tips: OverallExecutionTips = Field(description="整体执行建议")
 
 
 
