@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import asyncio
 import json
 import logging
 from typing import List, Dict, Any
@@ -72,7 +71,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             # 调用find_hot_notes函数
             result = await find_hot_notes(
                 promotion_target=self.state.promotion_target, 
-                max_pages=5,
+                max_pages=1,
                 output_dir="output"
             )
             
@@ -96,6 +95,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
                         comment=note_data.comment,
                         engage=note_data.engage
                     )
+                    logger.info(f"🔍 DEBUG: 找到笔记  note_title: {note.note_title}, note_url: {note.note_url}")
                     found_notes.append(note)
                 
                 self.state.found_notes = found_notes
@@ -150,6 +150,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
                 # 尝试批量获取内容（更高效）
                 note_urls = [note.note_url for note in self.state.found_notes]
                 print(f"🚀 开始批量获取 {len(note_urls)} 条笔记内容...")
+                logger.info(f"🔍 DEBUG: 开始批量采集笔记内容: {note_urls}")
                 
                 batch_results = client.batch_crawl_notes(note_urls, fetch_comments=False)
                 
@@ -166,6 +167,8 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
                         detailed_content = self._create_mock_note_content(note)
                     
                     self.state.detailed_notes.append(detailed_content)
+
+                    logger.info(f"🔍 DEBUG: 采集笔记内容成功: {note.note_title}, detailed_content: {detailed_content}")
                 
             else:
                 print("⚠️ MediaCrawler API服务器不可用，使用模拟数据")
@@ -205,10 +208,8 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             print("🧠 启动三维度深度内容分析...")
             print(f"📊 待分析笔记数量: {len(self.state.detailed_notes)}")
             
-            # 限制只分析前3个笔记以提高效率
-            analysis_notes = self.state.detailed_notes[:3] if len(self.state.detailed_notes) > 3 else self.state.detailed_notes
-            if len(self.state.detailed_notes) > 3:
-                print(f"✂️ 限制分析数量为3个笔记")
+            # 限制只分析前5个笔记以提高效率
+            analysis_notes = self.state.detailed_notes[:5]
             
             # 创建内容分析器
             content_analyzer = create_content_analyzer()
@@ -240,7 +241,7 @@ class XHSContentAnalysisFlow(Flow[XHSContentAnalysisState]):
             # 显示成功公式
             if analysis_report.success_formulas:
                 print(f"\n🎯 识别的成功公式:")
-                for i, formula in enumerate(analysis_report.success_formulas[:3], 1):
+                for i, formula in enumerate(analysis_report.success_formulas, 1):
                     print(f"  {i}. {formula}")
             
             # 显示共同模式
@@ -676,9 +677,9 @@ STAR法则：情境+任务+行动+结果
         print("="*70)
 
 
-async def kickoff_content_analysis(promotion_target: str = "国企央企求职辅导小程序", 
-                                  business_context: str = "",
-                                  business_goals: Dict[str, Any] = None):
+def kickoff_content_analysis(promotion_target: str = "国企央企求职辅导小程序", 
+                            business_context: str = "",
+                            business_goals: Dict[str, Any] = None):
     """启动内容分析与策略制定流程"""
     print("🚀 启动小红书内容分析与策略制定流程...")
     
@@ -692,10 +693,10 @@ async def kickoff_content_analysis(promotion_target: str = "国企央企求职�
     if business_goals:
         flow.state.business_goals = business_goals
     
-    # 执行流程
-    await flow.kickoff()
+    # 执行流程 (同步方式)
+    result = flow.kickoff()
     
-    return flow.state
+    return result
 
 
 def plot_content_analysis_flow():
@@ -704,7 +705,8 @@ def plot_content_analysis_flow():
     flow.plot()
 
 
-if __name__ == "__main__":
+def main():
+    """主函数入口点"""
     # 执行内容分析与策略制定流程
     business_goals = {
         "target_audience": "25-35岁准备进入国企央企的求职者",
@@ -714,10 +716,30 @@ if __name__ == "__main__":
         "budget_constraint": "中等预算，注重ROI"
     }
     
-    result = asyncio.run(kickoff_content_analysis(
+    result = kickoff_content_analysis(
         promotion_target="国企央企求职辅导小程序",
         business_context="专注于国企央企求职培训的教育机构",
         business_goals=business_goals
-    ))
+    )
+    
+    print("\n🎉 流程执行完成！")
+    return result
+
+
+if __name__ == "__main__":
+    # 执行内容分析与策略制定流程
+    business_goals = {
+        "target_audience": "22-35岁准备进入国企央企的求职者",
+        "content_volume": "每周发布3-5篇内容",
+        "conversion_goal": "小程序注册用户数提升50%",
+        "time_frame": "3个月内完成策略实施",
+        "budget_constraint": "中等预算，注重ROI"
+    }
+    
+    result = kickoff_content_analysis(
+        promotion_target="国企央企求职辅导小程序",
+        business_context="专注于国企央企求职培训的教育机构",
+        business_goals=business_goals
+    )
     
     print("\n🎉 流程执行完成！")

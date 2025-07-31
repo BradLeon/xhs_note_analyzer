@@ -3,6 +3,7 @@ import json
 import os
 import logging
 import pyperclip
+import psutil
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -15,6 +16,7 @@ from playwright.async_api import Page
 from crewai.tools import BaseTool
 import re
 
+
 # 配置详细日志
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +27,107 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+# 尝试导入EventBus用于内存监测
+try:
+    from bubus.service import EventBus
+    EVENTBUS_AVAILABLE = True
+except ImportError:
+    EVENTBUS_AVAILABLE = False
+    logger.warning("⚠️ 无法导入EventBus，内存监测功能将受限")
+
+
+async def monitor_eventbus_memory(interval: int = 30) -> None:
+    """
+    定时监测EventBus内存使用情况
+    
+    Args:
+        interval: 监测间隔，单位秒，默认30秒
+    """
+    if not EVENTBUS_AVAILABLE:
+        logger.warning("⚠️ EventBus不可用，跳过内存监测")
+        return
+        
+    monitor_count = 0
+    try:
+        logger.info(f"📊 开始内存监测，间隔{interval}秒")
+        
+        while True:
+            try:
+                monitor_count += 1
+                
+                # 获取当前进程内存使用情况
+                current_process = psutil.Process()
+                process_memory_mb = current_process.memory_info().rss / 1024 / 1024
+                
+                # 尝试获取EventBus的内存使用情况
+                eventbus_memory_mb = 0
+                active_instances = 0
+                
+                if hasattr(EventBus, '_instances') and EventBus._instances:
+                    active_instances = len([ref for ref in EventBus._instances if ref() is not None])
+                    # 简单估算EventBus内存使用
+                    eventbus_memory_mb = active_instances * 10  # 粗略估算每个实例10MB
+                
+                logger.info(f"📊 内存监测#{monitor_count} - 进程总内存: {process_memory_mb:.1f}MB, EventBus实例: {active_instances}, 估算EventBus内存: {eventbus_memory_mb:.1f}MB")
+                
+                # 内存警告阈值
+                if process_memory_mb > 500:  # 进程内存超过500MB
+                    logger.warning(f"⚠️ 进程内存使用过高: {process_memory_mb:.1f}MB")
+                    
+                if eventbus_memory_mb > 50:  # EventBus内存超过50MB
+                    logger.warning(f"⚠️ EventBus内存使用过高: {eventbus_memory_mb:.1f}MB，建议清理")
+                    
+            except Exception as e:
+                logger.error(f"❌ 内存监测失败: {e}")
+                
+            await asyncio.sleep(interval)
+            
+    except asyncio.CancelledError:
+        logger.info("🛑 内存监测任务已取消")
+        raise
+    except Exception as e:
+        logger.error(f"❌ 内存监测异常退出: {e}")
+
+async def cleanup_eventbus(agent: Agent = None) -> None:
+    """
+    清理EventBus内存
+    
+    Args:
+        agent: 需要清理的Agent实例
+    """
+    try:
+        logger.info("🧹 开始清理EventBus内存...")
+        
+        # 清理Agent相关的EventBus
+        if agent and hasattr(agent, '_eventbus'):
+            if hasattr(agent._eventbus, 'stop'):
+                await agent._eventbus.stop(clear=True)
+                logger.info("✅ Agent EventBus已清理")
+        
+        # 尝试清理全局EventBus实例
+        if EVENTBUS_AVAILABLE and hasattr(EventBus, '_instances'):
+            cleaned_count = 0
+            for ref in list(EventBus._instances):
+                instance = ref()
+                if instance is not None:
+                    try:
+                        if hasattr(instance, 'stop'):
+                            await instance.stop(clear=True)
+                        elif hasattr(instance, 'clear'):
+                            instance.clear()
+                        cleaned_count += 1
+                    except Exception as e:
+                        logger.warning(f"⚠️ 清理EventBus实例失败: {e}")
+            
+            if cleaned_count > 0:
+                logger.info(f"✅ 已清理 {cleaned_count} 个EventBus实例")
+        
+        logger.info("🧹 EventBus内存清理完成")
+        
+    except Exception as e:
+        logger.error(f"❌ EventBus清理失败: {e}")
 
 class NoteData(BaseModel):
     """笔记数据模型"""
@@ -354,7 +457,7 @@ def create_precision_controller() -> Controller:
         try:
             extraction_llm = ChatOpenAI(
                 base_url='https://openrouter.ai/api/v1',
-                model='qwen/qwen3-235b-a22b-07-25:free',
+                model='qwen/qwen3-235b-a22b-2507',
                 api_key=os.environ['OPENROUTER_API_KEY'],
                 temperature=0.1
             )
@@ -996,7 +1099,19 @@ class HotNoteFinder:
         logger.info(f"🎯 推广目标: {promotion_target}")
         logger.info(f"📄 最大页数: {max_pages}")
         
+        # 启动内存监测任务
+        memory_monitor_task = None
+        agent = None
+        
         try:
+            # 先执行初始EventBus清理
+            await cleanup_eventbus()
+            logger.info("🧹 初始EventBus清理完成")
+            
+            # 启动内存监测（缩短间隔到10秒进行测试）
+            memory_monitor_task = asyncio.create_task(monitor_eventbus_memory(10))
+            logger.info("📊 内存监测任务已启动")
+            
             # 创建状态管理器
             action_state = ActionStateManager()
             
@@ -1021,55 +1136,134 @@ class HotNoteFinder:
                 
                 logger.info(f"📊 任务执行完成，状态: {history.is_done()}")
                 
-                # 模拟从状态管理器获取结果（实际应该从agent执行结果中获取）
-                # 这里简化处理，返回示例数据结构
-                collected_notes_data = []
+                # 详细调试agent执行状态
+                logger.info(f"🔍 DEBUG: Agent执行历史分析:")
+                logger.info(f"  - 是否完成: {history.is_done()}")
+                logger.info(f"  - 是否有错误: {history.has_errors()}")
+                logger.info(f"  - 执行步数: {len(history.messages) if hasattr(history, 'messages') else 'N/A'}")
+                if hasattr(history, 'errors') and history.errors():
+                    logger.error(f"  - 错误列表: {history.errors()}")
                 
-                # 如果agent执行成功，尝试解析结果
+                # 尝试多种方式获取结果数据
+                collected_notes_data = []
+                data_source = "none"
+                
+                # 策略1: 从final_result获取
                 if history.is_done() and not history.has_errors():
                     final_result = history.final_result()
+                    logger.info(f"🔍 DEBUG: final_result类型: {type(final_result)}")
+                    logger.info(f"🔍 DEBUG: final_result内容: {repr(final_result)[:200]}...")
+                    
                     if final_result:
                         try:
                             # 尝试解析agent的结果
                             if isinstance(final_result, str):
-                                result_data = json.loads(final_result)
+                                if final_result.strip():  # 确保不是空字符串
+                                    result_data = json.loads(final_result)
+                                    if "note_data_list" in result_data:
+                                        collected_notes_data = result_data["note_data_list"]
+                                        data_source = "final_result"
+                                        logger.info(f"✅ 从final_result成功获取 {len(collected_notes_data)} 条数据")
+                                else:
+                                    logger.warning("⚠️ final_result是空字符串")
                             else:
                                 result_data = final_result
-                            
-                            if "note_data_list" in result_data:
-                                collected_notes_data = result_data["note_data_list"]
+                                if hasattr(result_data, 'get') and "note_data_list" in result_data:
+                                    collected_notes_data = result_data["note_data_list"]
+                                    data_source = "final_result_object"
                         except Exception as parse_error:
-                            logger.warning(f"⚠️ 解析agent结果失败: {parse_error}")
+                            logger.warning(f"⚠️ 解析final_result失败: {parse_error}")
                 
-                # 转换为NoteData对象列表
-                note_list = []
-                for note_data in collected_notes_data:
+                # 策略2: 从状态管理器获取已收集的数据
+                if not collected_notes_data:
+                    logger.info("🔍 DEBUG: 尝试从ActionStateManager获取数据")
                     try:
-                        # 从URL提取note_id
-                        note_url = note_data.get("note_url", "")
-                        note_id = ""
-                        if note_url:
-                            # 简单的note_id提取逻辑
-                            if "/note/" in note_url:
-                                note_id = note_url.split("/note/")[-1].split("?")[0]
-                            elif "/explore/" in note_url:
-                                note_id = note_url.split("/explore/")[-1].split("?")[0]
-                        
-                        note = NoteData(
-                            note_id=note_id,
-                            note_title=note_data.get("note_title", ""),
-                            note_url=note_url,
-                            impression=note_data.get("impression", 0),
-                            click=note_data.get("click", 0),
-                            like=note_data.get("like", 0),
-                            collect=note_data.get("collect", 0),
-                            comment=note_data.get("comment", 0),
-                            engage=note_data.get("engage", 0)
-                        )
-                        note_list.append(note)
-                    except Exception as e:
-                        logger.warning(f"⚠️ 跳过无效笔记数据: {e}")
-                        continue
+                        state_collected_notes = action_state.get_data("collected_notes", [])
+                        if state_collected_notes:
+                            collected_notes_data = state_collected_notes
+                            data_source = "state_manager"
+                            logger.info(f"✅ 从状态管理器获取 {len(collected_notes_data)} 条数据")
+                    except Exception as state_error:
+                        logger.warning(f"⚠️ 从状态管理器获取数据失败: {state_error}")
+                
+                # 策略3: 从执行历史中提取数据 
+                if not collected_notes_data and hasattr(history, 'messages'):
+                    logger.info("🔍 DEBUG: 尝试从执行历史中提取数据")
+                    try:
+                        for message in reversed(history.messages):  # 从最新的消息开始查找
+                            if hasattr(message, 'content') and message.content:
+                                content = str(message.content)
+                                if '"note_data_list"' in content or '"success": true' in content:
+                                    try:
+                                        # 尝试从消息内容中提取JSON
+                                        import re
+                                        json_match = re.search(r'\{.*"note_data_list".*\}', content, re.DOTALL)
+                                        if json_match:
+                                            result_data = json.loads(json_match.group())
+                                            if "note_data_list" in result_data:
+                                                collected_notes_data = result_data["note_data_list"]
+                                                data_source = "history_extraction"
+                                                logger.info(f"✅ 从执行历史提取 {len(collected_notes_data)} 条数据")
+                                                break
+                                    except:
+                                        continue
+                    except Exception as history_error:
+                        logger.warning(f"⚠️ 从执行历史提取数据失败: {history_error}")
+                
+                logger.info(f"📊 数据获取结果: 来源={data_source}, 数量={len(collected_notes_data)}")
+                
+                # 数据验证和转换
+                note_list = []
+                if collected_notes_data:
+                    logger.info(f"🔍 DEBUG: 开始验证和转换 {len(collected_notes_data)} 条笔记数据")
+                    
+                    for i, note_data in enumerate(collected_notes_data):
+                        try:
+                            # 验证数据结构
+                            if not isinstance(note_data, dict):
+                                logger.warning(f"⚠️ 笔记 {i+1} 数据格式错误: {type(note_data)}")
+                                continue
+                                
+                            # 确保必要字段存在
+                            required_fields = ['note_title', 'note_url']
+                            missing_fields = [field for field in required_fields if field not in note_data]
+                            if missing_fields:
+                                logger.warning(f"⚠️ 笔记 {i+1} 缺少必要字段: {missing_fields}")
+                                continue
+                                
+                            # 记录数据详情用于调试
+                            logger.debug(f"📝 笔记 {i+1}: {note_data.get('note_title', 'N/A')[:50]}...")
+                            
+                            # 从URL提取note_id
+                            note_url = note_data.get("note_url", "")
+                            note_id = ""
+                            if note_url:
+                                # 简单的note_id提取逻辑
+                                if "/note/" in note_url:
+                                    note_id = note_url.split("/note/")[-1].split("?")[0]
+                                elif "/explore/" in note_url:
+                                    note_id = note_url.split("/explore/")[-1].split("?")[0]
+                            
+                            note = NoteData(
+                                note_id=note_id,
+                                note_title=note_data.get("note_title", ""),
+                                note_url=note_url,
+                                impression=note_data.get("impression", 0),
+                                click=note_data.get("click", 0),
+                                like=note_data.get("like", 0),
+                                collect=note_data.get("collect", 0),
+                                comment=note_data.get("comment", 0),
+                                engage=note_data.get("engage", 0)
+                            )
+                            note_list.append(note)
+                            
+                        except Exception as e:
+                            logger.warning(f"⚠️ 跳过无效笔记数据 {i+1}: {e}")
+                            continue
+                    
+                    logger.info(f"✅ 数据验证完成，有效笔记: {len(note_list)}/{len(collected_notes_data)}")
+                else:
+                    logger.warning("⚠️ 未获取到任何笔记数据")
                 
                 if note_list:
                     # 保存结果
@@ -1142,6 +1336,39 @@ class HotNoteFinder:
             )
             
             return json.dumps(result.model_dump(), ensure_ascii=False, indent=2)
+        
+        finally:
+            # 检查并停止内存监测任务
+            if memory_monitor_task:
+                logger.info(f"🔍 DEBUG: 内存监测任务状态 - done: {memory_monitor_task.done()}, cancelled: {memory_monitor_task.cancelled()}")
+                if not memory_monitor_task.done():
+                    logger.info("🛑 正在取消内存监测任务...")
+                    memory_monitor_task.cancel()
+                    try:
+                        await memory_monitor_task
+                    except asyncio.CancelledError:
+                        logger.info("✅ 内存监测任务已取消")
+                    except Exception as cancel_error:
+                        logger.warning(f"⚠️ 取消内存监测任务时出错: {cancel_error}")
+                else:
+                    logger.info("📊 内存监测任务已自然结束")
+            
+            # 执行最终EventBus清理
+            if agent:
+                try:
+                    await cleanup_eventbus(agent)
+                    logger.info("✅ 最终EventBus清理完成")
+                except Exception as cleanup_error:
+                    logger.error(f"⚠️ 最终EventBus清理失败: {cleanup_error}")
+            else:
+                logger.info("🧹 执行全局EventBus清理")
+                try:
+                    await cleanup_eventbus()
+                    logger.info("✅ 全局EventBus清理完成")
+                except Exception as cleanup_error:
+                    logger.error(f"⚠️ 全局EventBus清理失败: {cleanup_error}")
+            
+            logger.info("🔄 资源清理完成")
 
 async def find_hot_notes(promotion_target: str, max_pages: int = 3, output_dir: str = "output") -> ToolExecutionResult:
     """

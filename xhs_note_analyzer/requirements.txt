@@ -3,7 +3,7 @@ crewai>=0.70.0
 crewai-tools>=0.10.0
 
 # browser_use自动化框架
-browser-use>=1.5.0
+browser-use==0.3.0
 
 # LLM和AI服务
 langchain-openai>=0.1.0
@@ -40,4 +40,7 @@ pathlib2>=2.3.7
 ujson>=5.8.0
 
 # 时间处理
-python-dateutil>=2.8.0 
+python-dateutil>=2.8.0
+
+# 剪贴板操作
+pyperclip>=1.8.0 

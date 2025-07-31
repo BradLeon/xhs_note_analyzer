@@ -3,15 +3,23 @@ name = "xhs_note_analyzer"
 version = "0.1.0"
 description = "xhs_note_analyzer using crewAI"
 authors = [{ name = "Your Name", email = "you@example.com" }]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.13"
 dependencies = [
-    "crewai[tools]>=0.114.0,<1.0.0",
+    "crewai[tools]==0.130.0",
+    "pyperclip",
+    "browser-use==0.3.0",
+    "langchain-openai==0.3.21",
+    "pydantic>=2.0.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "playwright>=1.40.0",
 ]
 
 [project.scripts]
-kickoff = "xhs_note_analyzer.main:kickoff"
-run_crew = "xhs_note_analyzer.main:kickoff"
-plot = "xhs_note_analyzer.main:plot"
+kickoff = "xhs_note_analyzer.main:main"
+run_crew = "xhs_note_analyzer.main:main"
+plot = "xhs_note_analyzer.main:plot_content_analysis_flow"
 
 [build-system]
 requires = ["hatchling"]
